@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Scaffold backend and frontend workspaces with runtime shells and smoke verification
 - [x] 01-02-PLAN.md — Add root env contracts, backend settings, and explicit mock-safe runtime visibility
-- [x] 01-03-PLAN.md — Create Dockerfiles, `.dockerignore` files, and a two-service compose topology
+- [x] 01-03-PLAN.md — Create Dockerfiles and a two-service compose topology
 - [x] 01-04-PLAN.md — Document bootstrap flow and add automated startup verification
 
 ### Phase 2: Market Data & Event Backbone
@@ -184,7 +184,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Local Runtime | 0/4 | Not started | - |
+| 1. Foundation & Local Runtime | 4/4 | Verifying | - |
 | 2. Market Data & Event Backbone | 0/4 | Not started | - |
 | 3. PrimoAgent Core Graph | 0/4 | Not started | - |
 | 4. Execution Engine & Paper Trading | 0/4 | Not started | - |
