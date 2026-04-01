@@ -1,36 +1,35 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: milestone_archived
-stopped_at: v1.0 archived after operator runbook acceptance; local ship complete, remote ship pending git remote configuration
-last_updated: "2026-04-01T08:35:00Z"
+milestone: v1.1
+milestone_name: bilingual-ux-live-market-readiness
+status: in_progress
+last_updated: "2026-04-01T13:40:00Z"
 last_activity: 2026-04-01
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 36
-  completed_plans: 36
-  percent: 100
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 12
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` and `.planning/milestones/v1.0-SUMMARY.md`
+See: `.planning/PROJECT.md`, `.planning/REQUIREMENTS.md`, and `.planning/ROADMAP.md`
 
 **Core value:** Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
-**Current focus:** Milestone archived; waiting for next milestone definition or remote ship completion.
+**Current focus:** v1.1 kickoff — phase-ready planning for bilingual UX, real-market truthfulness, and RD-Agent hardening.
 
 ## Current Position
 
-Phase: Archived
-Plan: Milestone complete and archived
-Status: Local ship verified, remote ship pending
-Last activity: 2026-04-01 — operator runbook acceptance, provider verification, milestone archive, and phase cleanup
+Phase: Phase 10 — Bilingual UX Foundation
+Plan: Not started
+Status: Milestone defined, ready to discuss/plan Phase 10
+Last activity: 2026-04-01 — v1.1 milestone created from bilingual UX + real market + RD-Agent hardening scope
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Accumulated Context
 
@@ -41,10 +40,10 @@ Progress: [██████████] 100%
 
 ## Blockers/Concerns
 
-- No git remote configured, so push / PR / merge workflow cannot run yet.
+- RD-Agent real path is invoked successfully, but first-run completion remains slow/opaque because upstream qlib/bootstrap work can outlive normal demo timeouts.
 
 ## Session Continuity
 
-Last session: 2026-04-01 16:35 CST
-Stopped at: `v1.0` archived locally; next recommended action is `$gsd-new-milestone` or configure a remote and finish ship.
+Last session: 2026-04-01 21:40 CST
+Stopped at: v1.1 milestone defined; next recommended action is `$gsd-discuss-phase 10` or direct autonomous execution of Phase 10.
 Resume file: None

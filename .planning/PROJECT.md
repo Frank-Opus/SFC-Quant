@@ -4,7 +4,7 @@
 
 dSFC-Quant is a standalone open-source AI/Agent quantitative trading platform for local deployment. It combines a PrimoAgent-based multi-agent research and decision layer, a Freqtrade + ccxt execution layer for paper and live trading, and a high-end React trading dashboard that streams market state, signals, positions, and risk telemetry in real time.
 
-The product is aimed at technical traders and builders who want an explainable, extensible quant stack they can run themselves instead of a hosted black box. The v1 focus is a single-repo system that feels professional to use, is safe to test locally, and can graduate from simulation to guarded live execution.
+The product is aimed at technical traders and builders who want an explainable, extensible quant stack they can run themselves instead of a hosted black box. The current focus extends the locally verified v1 baseline into a more operator-ready system with bilingual UX, truthful real-market visibility, and a more production-honest optional RD-Agent workflow.
 
 ## Core Value
 
@@ -14,17 +14,21 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 
 - Latest archived release: `v1.0`
 - Archive date: 2026-04-01
-- Ship state: locally verified and archived; remote push/PR pending repository remote setup
+- Local runtime status: backend/frontend verified locally, runbook acceptance repeated, RD-Agent real path invoked but first-run completion still needs hardening
 - Archive links:
   - `.planning/milestones/v1.0-SUMMARY.md`
   - `.planning/milestones/v1.0-ROADMAP.md`
   - `.planning/milestones/v1.0-REQUIREMENTS.md`
 
-## Next Milestone Goals
+## Current Milestone: v1.1 Bilingual UX & Live Market Readiness
 
-- Define the next milestone scope with fresh requirements and roadmap entries
-- Decide whether to add a remote and complete push/PR-based ship workflow
-- Preserve `paper` + `mock-safe` defaults while extending provider, execution, or dashboard capabilities
+**Goal:** turn the v1 local demo into a more operator-ready build with runtime zh/en switching, opt-in real market data, and honest RD-Agent completion diagnostics.
+
+**Target features:**
+- Add Chinese/English bilingual support with a visible language toggle and persistent preference
+- Add opt-in real market data mode through the existing ccxt seam while preserving `mock-safe` defaults
+- Make dashboard and diagnostics clearly show whether the system is using mock data, real exchange data, or a degraded fallback
+- Harden optional RD-Agent strategy generation so first-run progress/failure is visible and locally testable
 
 ## Requirements
 
@@ -42,68 +46,57 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 
 ### Active
 
-- [ ] Build a standalone repo named `dSFC-Quant` with a Python FastAPI backend and Vite/React frontend.
-- [ ] Integrate PrimoAgent as the AI agent brain with clear data, technical-analysis, news/geopolitics, and risk/decision roles.
-- [ ] Use Freqtrade + ccxt for execution, supporting paper trading first and guarded real-order routing second.
-- [ ] Deliver a dark, trader-grade dashboard using Tremor, TradingView Lightweight Charts, shadcn/ui, Tailwind, and Framer Motion.
-- [ ] Support third-party AI providers through environment-based configuration and provider adapters.
-- [ ] Make local deployment lightweight and reproducible with `docker-compose.yml`, `.env` examples, health checks, and smoke-testable flows.
+- [ ] User can switch the dashboard between Chinese and English at runtime and the preference persists locally.
+- [ ] Dashboard labels, controls, timestamps, and money/number formatting follow the selected locale without hiding risk state.
+- [ ] Operator can opt into real market data through the existing exchange/ccxt seam while `mock-safe` remains the default startup path.
+- [ ] Runtime diagnostics and UI surfaces clearly indicate whether market data is `mock`, `ccxt`, or fallback/degraded.
+- [ ] Optional RD-Agent strategy generation exposes progress/failure honestly enough for demo and local operator acceptance.
+- [ ] Release verification covers bilingual UX, real-market mode, and RD-Agent first-run behavior.
 
 ### Out of Scope
 
 - High-frequency / ultra-low-latency trading infrastructure — Freqtrade + Python + WebSocket orchestration is not the right substrate for HFT.
 - Custodial fund management or copy-trading marketplace features — this project is a self-hosted tool, not a regulated custody or social brokerage product.
-- Native mobile apps — web-first delivery is the right scope for v1 and keeps the team focused on execution quality.
+- Native mobile apps — web-first delivery is the right scope for the current milestone and keeps the team focused on operator quality.
 - Fully autonomous live trading without explicit risk gates and operator controls — the product must preserve human oversight before it escalates to real funds.
 
 ## Context
 
-This is a greenfield project with no existing application code. The repo already contains OpenSpec and GSD planning tooling, but the product itself is new and will be built from scratch.
+This is a brownfield continuation of a locally shipped v1 milestone. The technical direction remains intentionally opinionated. The backend stays Python-centric because PrimoAgent, Freqtrade, ccxt, and optional RD-Agent(Q) all live naturally in that ecosystem. The frontend still emphasizes a premium finance-oriented operator experience, but now it must also support bilingual operation and remain legible in both Chinese and English.
 
-The technical direction is intentionally opinionated. The backend must stay Python-centric because PrimoAgent, Freqtrade, ccxt, and optional RD-Agent(Q) all live naturally in that ecosystem. The frontend must emphasize a premium, dark, finance-oriented operator experience instead of a generic admin panel, with glassmorphism controls, live charting, streaming logs, and motion that feels deliberate rather than decorative.
-
-The system must run locally with minimal setup friction. That means a single repository, a two-service `docker-compose.yml` baseline (`backend` + `frontend`), environment-driven secrets, mock/simulated fallback modes, and a paper-trading-first workflow that lets users validate the full stack before turning on live trading.
+The runtime must remain local-first and lightweight. That means a single repository, a two-service `docker-compose.yml` baseline (`backend` + `frontend`), environment-driven secrets, mock/simulated fallback modes, and a paper-trading-first workflow. New real-market behavior must be opt-in and must never silently weaken the current safe defaults.
 
 ## Constraints
 
-- **Project Name**: Repo/application name must be `dSFC-Quant` — required by the product brief.
-- **AI Stack**: PrimoAgent is the required agent brain — the core orchestration must preserve a multi-agent architecture instead of collapsing into a single chat model.
-- **Execution Stack**: Freqtrade + ccxt are mandatory for order routing and exchange abstraction — avoids custom exchange plumbing and preserves paper/live parity.
-- **Optional Strategy Factory**: RD-Agent(Q) is additive, not foundational — the platform must still work when it is disabled.
-- **Backend**: FastAPI + WebSocket are mandatory — the backend must expose real-time state to the dashboard and act as the local control plane.
-- **Frontend**: Vite + React + Tremor + TradingView Lightweight Charts + shadcn/ui + Tailwind + Framer Motion are mandatory — visual execution cannot drift into a plain CRUD dashboard.
-- **Deployment**: Local-first and lightweight — the default stack must run on a developer workstation without Kubernetes or a cloud dependency.
-- **Provider Support**: Third-party AI providers must be swappable — avoid hard-wiring the system to a single hosted model vendor.
-- **Safety**: Paper trading must be a first-class path and live trading must require explicit enablement — this is a non-negotiable product boundary.
+- **Project Name**: Repo/application name must be `dSFC-Quant`.
+- **AI Stack**: PrimoAgent remains the required agent brain.
+- **Execution Stack**: Freqtrade + ccxt remain mandatory for order routing and exchange abstraction.
+- **Optional Strategy Factory**: RD-Agent(Q) remains additive, not foundational.
+- **Backend**: FastAPI + WebSocket remain mandatory.
+- **Frontend**: Vite + React + Tremor + TradingView Lightweight Charts + shadcn/ui + Tailwind + Framer Motion remain mandatory.
+- **Deployment**: Local-first and lightweight — default stack must still run on a developer workstation without Kubernetes or cloud dependencies.
+- **Provider Support**: Third-party AI providers must remain swappable.
+- **Safety**: Paper trading remains the first-class path and live trading still requires explicit enablement.
+- **Truthful Runtime Surfaces**: Real-market and RD-Agent readiness must be reported honestly; do not imply success when the system is still in fallback, build, or degraded mode.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Use `dSFC-Quant` as the repository/runtime name and present SFC-Quant as the product identity | Matches the user brief while keeping the codebase identifier explicit | — Pending |
-| Keep the stack as a single repo with `backend/` and `frontend/` rather than split repos | Simplifies local setup, docker-compose, and contributor onboarding | — Pending |
-| Use FastAPI as the control plane around Freqtrade instead of exposing Freqtrade directly to the UI | Keeps one backend API surface for auth-free local use, WebSocket fanout, orchestration, and risk gating | — Pending |
-| Treat Freqtrade paper mode as the default execution path | Preserves realistic testing and reduces live-trading risk during early phases | — Pending |
-| Model the AI workflow as explicit PrimoAgent subroles: market data, technical analysis, news/geopolitics, and risk/decision | Matches the requested multi-agent design and keeps reasoning inspectable | — Pending |
-| Build a premium operator dashboard instead of a conventional admin panel | The UI is a differentiator and explicitly called out as a core requirement | — Pending |
-| Keep docker-compose to two primary services (`backend`, `frontend`) for v1 | Minimizes local complexity while still satisfying one-command startup | — Pending |
-| Make RD-Agent(Q) an optional extension point that writes reviewable strategy artifacts | Preserves the requested integration without making v1 depend on research automation | — Pending |
-| Use typed market/event contracts plus append-only JSONL replay storage for the Phase 2 backbone | Keeps runtime telemetry inspectable, local-first, and easy to replay without adding a database too early | Accepted 2026-04-01 |
-| Keep a ccxt-facing adapter boundary but default Phase 2 market reads to deterministic mock generation in safe mode | Satisfies the exchange-adapter requirement without making local startup depend on external market access | Accepted 2026-04-01 |
-| Use an in-process websocket hub for backend event fanout during early phases | Preserves the mandated lightweight local deployment while establishing the realtime seam the dashboard and agents need | Accepted 2026-04-01 |
-| Refactor replay + websocket publication into a shared backend event bus in Phase 3 | Lets market, agent, and later execution/risk events share one inspectable local-first transport path | Accepted 2026-04-01 |
-| Implement Phase 3 AI orchestration as explicit typed role outputs behind a narrow provider factory | Preserves PrimoAgent explainability while keeping provider-specific logic out of routes and downstream phases | Accepted 2026-04-01 |
-| Keep the Phase 3 news/macro role honest about missing external evidence instead of fabricating sources | Protects explainability and operator trust until richer evidence ingestion lands in later phases | Accepted 2026-04-01 |
-| Add a paper-only execution service with a Freqtrade-shaped adapter seam before any live routing | Proves the signal-to-order control plane while preserving the product's safety-first boundary | Accepted 2026-04-01 |
-| Keep Phase 4 execution spot-style and long-only | Avoids inventing unsupported short/leverage behavior before risk and live-mode phases land | Accepted 2026-04-01 |
-| Centralize mutable guardrails and live-mode state in a dedicated RiskService | Keeps policy enforcement auditable and reusable across execution, UI, and later live-routing flows | Accepted 2026-04-01 |
-| Require explicit confirmation text plus non-mock runtime and credentials before live mode can enable | Makes accidental real-money routing materially harder | Accepted 2026-04-01 |
-| Compose the Phase 6 dashboard from existing backend status routes plus websocket-triggered refreshes | Keeps the control plane explainable and avoids inventing a dashboard-only backend facade | Accepted 2026-04-01 |
-| Add local shadcn-style primitives plus targeted Tremor primitives for the dashboard shell | Turns the mandated frontend stack into real, reusable code without overbuilding the UI system too early | Accepted 2026-04-01 |
-| Build Phase 7 analytics entirely from the existing dashboard runtime state | Delivers richer visuals without inventing a dashboard-only backend analytics surface too early | Accepted 2026-04-01 |
-| Enrich the Phase 8 news/macro role directly inside the typed PrimoAgent output contract | Preserves explainability and lets the dashboard reuse the existing analysis surface instead of inventing a second thesis API | Accepted 2026-04-01 |
-| Keep Strategy Factory review-first with honest configured/effective provider status | Adds a real optional RD-Agent(Q) seam without pretending the full external research pipeline is already live | Accepted 2026-04-01 |
-| Add dedicated smoke tests plus health/live/ready diagnostics instead of external observability tooling | Satisfies release hardening requirements while preserving the repo's local-first lightweight deployment model | Accepted 2026-04-01 |
+| Keep v1 archived and start v1.1 as an extension milestone instead of reopening old phases | Preserves historical traceability while allowing focused follow-up work | Accepted 2026-04-01 |
+| Implement bilingual support as a runtime locale layer rather than parallel hardcoded copies | Keeps future UI work maintainable and avoids copy drift | Accepted 2026-04-01 |
+| Keep real market data opt-in behind explicit config while preserving `mock-safe` defaults | Maintains safe local startup and honest demos even without exchange access | Accepted 2026-04-01 |
+| Surface market data source (`mock`, `ccxt`, fallback) in both backend diagnostics and frontend UI | Prevents operator confusion about whether data is simulated or live | Accepted 2026-04-01 |
+| Treat RD-Agent first-run environment/bootstrap behavior as a hardening problem, not proof of completion | Avoids overstating production readiness while retaining the real integration seam | Accepted 2026-04-01 |
+| Use a three-phase v1.1 milestone focused on bilingual UX, real-market readiness, and RD-Agent/test hardening | Keeps scope tight enough to complete autonomously without diluting the operator-ready goal | Accepted 2026-04-01 |
+| Use `dSFC-Quant` as the repository/runtime name and present SFC-Quant as the product identity | Matches the user brief while keeping the codebase identifier explicit | Accepted 2026-04-01 |
+| Keep the stack as a single repo with `backend/` and `frontend/` rather than split repos | Simplifies local setup, docker-compose, and contributor onboarding | Accepted 2026-04-01 |
+| Use FastAPI as the control plane around Freqtrade instead of exposing Freqtrade directly to the UI | Keeps one backend API surface for auth-free local use, WebSocket fanout, orchestration, and risk gating | Accepted 2026-04-01 |
+| Treat Freqtrade paper mode as the default execution path | Preserves realistic testing and reduces live-trading risk during early phases | Accepted 2026-04-01 |
+| Model the AI workflow as explicit PrimoAgent subroles: market data, technical analysis, news/geopolitics, and risk/decision | Matches the requested multi-agent design and keeps reasoning inspectable | Accepted 2026-04-01 |
+| Build a premium operator dashboard instead of a conventional admin panel | The UI is a differentiator and explicitly called out as a core requirement | Accepted 2026-04-01 |
+| Keep docker-compose to two primary services (`backend`, `frontend`) for v1+ | Minimizes local complexity while still satisfying one-command startup | Accepted 2026-04-01 |
+| Make RD-Agent(Q) an optional extension point that writes reviewable strategy artifacts | Preserves the requested integration without making core functionality depend on research automation | Accepted 2026-04-01 |
 
 ## Evolution
 
@@ -123,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 9*
+*Last updated: 2026-04-01 for v1.1 milestone kickoff*
