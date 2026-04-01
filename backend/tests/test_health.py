@@ -10,6 +10,8 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
         "LIVE_TRADING_ENABLED",
         "AI_PROVIDER",
         "AI_API_KEY",
+        "AI_BASE_URL",
+        "AI_MODEL",
         "EXCHANGE_API_KEY",
         "EXCHANGE_API_SECRET",
     ):

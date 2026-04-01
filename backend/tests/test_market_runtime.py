@@ -8,6 +8,10 @@ from app.main import app
 
 def configure_market_env(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("APP_MODE", "mock")
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    monkeypatch.delenv("AI_API_KEY", raising=False)
+    monkeypatch.delenv("AI_BASE_URL", raising=False)
+    monkeypatch.delenv("AI_MODEL", raising=False)
     monkeypatch.setenv("MARKET_SYMBOLS", "BTC/USDT")
     monkeypatch.setenv("MARKET_TIMEFRAMES", "1m")
     monkeypatch.setenv("MARKET_HISTORY_LIMIT", "4")

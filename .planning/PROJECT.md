@@ -14,7 +14,9 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] Phase 1 validated the local monorepo runtime, env-driven startup, and two-service Compose baseline.
+- [x] Phase 2 validated normalized market snapshots, replayable JSONL events, and websocket delivery.
+- [x] Phase 3 validated a typed PrimoAgent core workflow with per-role outputs and a swappable provider seam.
 
 ### Active
 
@@ -67,6 +69,9 @@ The system must run locally with minimal setup friction. That means a single rep
 | Use typed market/event contracts plus append-only JSONL replay storage for the Phase 2 backbone | Keeps runtime telemetry inspectable, local-first, and easy to replay without adding a database too early | Accepted 2026-04-01 |
 | Keep a ccxt-facing adapter boundary but default Phase 2 market reads to deterministic mock generation in safe mode | Satisfies the exchange-adapter requirement without making local startup depend on external market access | Accepted 2026-04-01 |
 | Use an in-process websocket hub for backend event fanout during early phases | Preserves the mandated lightweight local deployment while establishing the realtime seam the dashboard and agents need | Accepted 2026-04-01 |
+| Refactor replay + websocket publication into a shared backend event bus in Phase 3 | Lets market, agent, and later execution/risk events share one inspectable local-first transport path | Accepted 2026-04-01 |
+| Implement Phase 3 AI orchestration as explicit typed role outputs behind a narrow provider factory | Preserves PrimoAgent explainability while keeping provider-specific logic out of routes and downstream phases | Accepted 2026-04-01 |
+| Keep the Phase 3 news/macro role honest about missing external evidence instead of fabricating sources | Protects explainability and operator trust until richer evidence ingestion lands in later phases | Accepted 2026-04-01 |
 
 ## Evolution
 
@@ -86,4 +91,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after initialization*
+*Last updated: 2026-04-01 after Phase 3*

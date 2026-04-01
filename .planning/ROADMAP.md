@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Local Runtime** - Create the repo runtime, service skeletons, env contracts, and compose startup flow. (completed 2026-04-01)
 - [x] **Phase 2: Market Data & Event Backbone** - Normalize market data, define event contracts, and stream backend state. (completed 2026-04-01)
-- [ ] **Phase 3: PrimoAgent Core Graph** - Build the multi-agent analysis and provider abstraction layer.
+- [x] **Phase 3: PrimoAgent Core Graph** - Build the multi-agent analysis and provider abstraction layer. (completed 2026-04-01)
 - [ ] **Phase 4: Execution Engine & Paper Trading** - Integrate Freqtrade/ccxt into a realistic dry-run trade loop.
 - [ ] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls.
 - [ ] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates.
@@ -70,10 +70,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: Define PrimoAgent role graph and typed decision contracts
-- [ ] 03-02: Implement provider adapter boundary for third-party AI vendors
-- [ ] 03-03: Add orchestration services for manual and scheduled analysis runs
-- [ ] 03-04: Persist and expose per-agent rationale/status payloads
+- [x] 03-01: Define PrimoAgent role graph and typed decision contracts
+- [x] 03-02: Implement provider adapter boundary for third-party AI vendors
+- [x] 03-03: Add orchestration services for manual and scheduled analysis runs
+- [x] 03-04: Persist and expose per-agent rationale/status payloads
 
 ### Phase 4: Execution Engine & Paper Trading
 **Goal**: Route approved signals through a realistic Freqtrade-backed paper-trading loop.
@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. Foundation & Local Runtime | 4/4 | Complete    | 2026-04-01 |
 | 2. Market Data & Event Backbone | 4/4 | Complete    | 2026-04-01 |
-| 3. PrimoAgent Core Graph | 0/4 | Not started | - |
+| 3. PrimoAgent Core Graph | 4/4 | Complete    | 2026-04-01 |
 | 4. Execution Engine & Paper Trading | 0/4 | Not started | - |
 | 5. Risk Guardrails & Live Gating | 0/4 | Not started | - |
 | 6. Pro Trading Dashboard Shell | 0/5 | Not started | - |

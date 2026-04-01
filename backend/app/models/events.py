@@ -11,6 +11,9 @@ EventType = Literal[
     "system.warning",
     "market.snapshot",
     "market.tick",
+    "agent.analysis.requested",
+    "agent.role.completed",
+    "agent.analysis.completed",
 ]
 
 

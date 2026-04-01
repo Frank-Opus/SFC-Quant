@@ -1,16 +1,13 @@
 import asyncio
 import math
-from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
-from uuid import uuid4
 
 from app.core.config import Settings
 from app.core.runtime import resolve_runtime
 from app.models.events import EventEnvelope, MarketSnapshotResponse
 from app.models.market import Candle, MarketSnapshot
-from app.services.event_store import JsonlEventStore
-from app.services.realtime import WebSocketHub
+from app.services.event_bus import EventBus
 
 try:
     import ccxt  # type: ignore
@@ -149,25 +146,20 @@ class MarketRuntimeService:
     def __init__(
         self,
         settings: Settings,
-        event_store: JsonlEventStore,
-        websocket_hub: WebSocketHub,
+        event_bus: EventBus,
     ) -> None:
         self._settings = settings
-        self._event_store = event_store
-        self._websocket_hub = websocket_hub
+        self._event_bus = event_bus
         self._mock_adapter = MockMarketDataAdapter()
         self._exchange_adapter = CcxtMarketDataAdapter()
         self._latest: dict[str, MarketSnapshot] = {}
-        self._recent_events: deque[EventEnvelope] = deque(
-            maxlen=settings.market_event_buffer_size
-        )
         self._refresh_lock = asyncio.Lock()
         self._stream_task: asyncio.Task | None = None
         self._shutdown = asyncio.Event()
 
     @property
     def event_log_path(self) -> str:
-        return str(self._event_store.path)
+        return self._event_bus.event_log_path
 
     async def initialize(self) -> None:
         await self.refresh_once()
@@ -188,19 +180,38 @@ class MarketRuntimeService:
             snapshots: list[MarketSnapshot] = []
             for symbol in self._settings.market_symbols:
                 for timeframe in self._settings.market_timeframes:
-                    snapshot = await self._fetch_snapshot(symbol=symbol, timeframe=timeframe)
-                    snapshots.append(snapshot)
-                    self._latest[f"{symbol}:{timeframe}"] = snapshot
-                    await self._record_event(
-                        event_type="market.tick",
-                        payload=snapshot.model_dump(mode="json"),
+                    snapshots.append(
+                        await self.ensure_snapshot(
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            force_refresh=True,
+                        )
                     )
             return snapshots
+
+    async def ensure_snapshot(
+        self,
+        *,
+        symbol: str,
+        timeframe: str,
+        force_refresh: bool = False,
+    ) -> MarketSnapshot:
+        key = f"{symbol}:{timeframe}"
+        if not force_refresh and key in self._latest:
+            return self._latest[key]
+
+        snapshot = await self._fetch_snapshot(symbol=symbol, timeframe=timeframe)
+        self._latest[key] = snapshot
+        await self._record_event(
+            event_type="market.tick",
+            payload=snapshot.model_dump(mode="json"),
+        )
+        return snapshot
 
     def snapshot_response(self, limit: int = 12) -> MarketSnapshotResponse:
         runtime = resolve_runtime(self._settings)
         snapshots = list(self._latest.values())
-        recent_events = self.get_recent_events(limit=limit)
+        recent_events = self._event_bus.get_recent_events(limit=limit)
         generated_at = max(
             (snapshot.generated_at for snapshot in snapshots),
             default=datetime.now(timezone.utc),
@@ -210,24 +221,6 @@ class MarketRuntimeService:
             runtime=runtime,
             snapshots=snapshots,
             recent_events=recent_events,
-        )
-
-    def get_recent_events(self, limit: int = 50) -> list[EventEnvelope]:
-        recent = list(self._recent_events)[-limit:]
-        if recent:
-            return list(reversed(recent))
-        stored = self._event_store.read_recent(limit=limit)
-        return list(reversed(stored))
-
-    async def connection_event(self) -> EventEnvelope:
-        return EventEnvelope(
-            event_id=str(uuid4()),
-            event_type="system.connected",
-            generated_at=datetime.now(timezone.utc),
-            payload={
-                "connections": self._websocket_hub.connection_count,
-                "event_log_path": self.event_log_path,
-            },
         )
 
     async def _stream_loop(self) -> None:
@@ -269,15 +262,7 @@ class MarketRuntimeService:
         )
 
     async def _record_event(self, *, event_type: str, payload: dict) -> None:
-        event = EventEnvelope(
-            event_id=str(uuid4()),
-            event_type=event_type,
-            generated_at=datetime.now(timezone.utc),
-            payload=payload,
-        )
-        self._recent_events.append(event)
-        self._event_store.append(event)
-        await self._websocket_hub.broadcast(event.model_dump(mode="json"))
+        await self._event_bus.publish(event_type=event_type, payload=payload)
 
 
 def _fetch_ohlcv_records(exchange_class, symbol: str, timeframe: str, history_limit: int):

@@ -7,10 +7,11 @@ router = APIRouter(tags=["realtime"])
 async def websocket_stream(websocket: WebSocket) -> None:
     service = websocket.app.state.market_service
     hub = websocket.app.state.websocket_hub
+    event_bus = websocket.app.state.event_bus
 
     await hub.connect(websocket)
     try:
-        connection_event = await service.connection_event()
+        connection_event = await event_bus.connection_event()
         await hub.send_personal_message(
             websocket,
             connection_event.model_dump(mode="json"),

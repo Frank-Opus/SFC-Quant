@@ -11,6 +11,7 @@ class RuntimeSnapshot(BaseModel):
     app_mode: str
     runtime_mode: str
     ai_provider: str
+    ai_model: str | None
     exchange_id: str
     ai_credentials_present: bool
     exchange_credentials_present: bool
@@ -25,7 +26,9 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
     exchange_credentials_present = bool(
         settings.exchange_api_key and settings.exchange_api_secret
     )
-    ai_credentials_present = settings.ai_provider == "mock" or bool(settings.ai_api_key)
+    ai_credentials_present = settings.ai_provider == "mock" or bool(
+        settings.ai_api_key and settings.ai_base_url and settings.ai_model
+    )
     live_trading_requested = settings.live_trading_enabled
     live_trading_enabled = False
 
@@ -47,10 +50,18 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
                 "Live trading requested without exchange credentials; forcing live trading off."
             )
 
-    if settings.ai_provider != "mock" and not settings.ai_api_key:
-        warnings.append(
-            f"AI provider '{settings.ai_provider}' is configured without AI_API_KEY; backend remains in safe startup mode."
-        )
+    if settings.ai_provider != "mock":
+        missing_fields: list[str] = []
+        if not settings.ai_api_key:
+            missing_fields.append("AI_API_KEY")
+        if not settings.ai_base_url:
+            missing_fields.append("AI_BASE_URL")
+        if not settings.ai_model:
+            missing_fields.append("AI_MODEL")
+        if missing_fields:
+            warnings.append(
+                f"AI provider '{settings.ai_provider}' is configured without {', '.join(missing_fields)}; backend remains in safe startup mode."
+            )
 
     return RuntimeSnapshot(
         name=settings.app_name,
@@ -60,6 +71,7 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
         app_mode=settings.app_mode,
         runtime_mode=runtime_mode,
         ai_provider=settings.ai_provider,
+        ai_model=settings.ai_model,
         exchange_id=settings.exchange_id,
         ai_credentials_present=ai_credentials_present,
         exchange_credentials_present=exchange_credentials_present,
@@ -67,4 +79,3 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
         live_trading_enabled=live_trading_enabled,
         warnings=warnings,
     )
-

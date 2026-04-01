@@ -10,7 +10,7 @@ Standalone AI/Agent quant trading platform focused on local-first operation, exp
 - `frontend/` — Vite + React shell for the custom trading workstation UI
 - `docker-compose.yml` — one-command local startup for `backend` and `frontend`
 
-The repo now includes the Phase 1 local runtime foundation plus the Phase 2 market-data/event backbone. PrimoAgent workflows, exchange execution, and the final pro dashboard still land in later phases.
+The repo now includes the Phase 1 local runtime foundation, the Phase 2 market-data/event backbone, and the Phase 3 PrimoAgent analysis core. Exchange execution and the final pro dashboard still land in later phases.
 
 ## Tech Stack
 
@@ -46,6 +46,9 @@ Important keys:
 - `APP_MODE=mock`
 - `LIVE_TRADING_ENABLED=false`
 - `AI_PROVIDER=mock`
+- `AI_BASE_URL=`
+- `AI_MODEL=`
+- `AI_TIMEOUT_SECONDS=30`
 - `EXCHANGE_ID=binance`
 - `FRONTEND_API_URL=http://backend:8000`
 - `FRONTEND_WS_URL=ws://backend:8000/ws`
@@ -62,8 +65,9 @@ The platform still defaults to `mock-safe` startup:
 - Missing exchange credentials keep the backend in a safe non-live state
 - `LIVE_TRADING_ENABLED=false` keeps live trading disabled by default
 - `AI_PROVIDER=mock` allows startup without third-party AI credentials
+- Set `AI_PROVIDER=openai_compatible` together with `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` to call an OpenAI-compatible vendor
 
-The backend exposes the resolved runtime state through `/health`, serves normalized market state from `/api/market/snapshot`, replayable recent events from `/api/events/recent`, and streams live updates over `/ws`.
+The backend exposes the resolved runtime state through `/health`, serves normalized market state from `/api/market/snapshot`, replayable recent events from `/api/events/recent`, supports on-demand multi-agent analysis through `POST /api/analysis/run`, returns the last stored result through `/api/analysis/latest`, and streams live updates over `/ws`.
 
 ## Current Phase Scope
 
@@ -75,6 +79,9 @@ Current shipped scope includes:
 - typed market snapshot and event contracts
 - JSONL-backed replayable event logging
 - websocket broadcast for backend market state changes
+- typed PrimoAgent role outputs with rationale, confidence, and recommendation metadata
+- swappable AI provider boundary with mock and OpenAI-compatible modes
+- on-demand multi-agent analysis persistence and latest-result retrieval
 - frontend live market monitoring shell
 - Dockerfiles and a two-service `docker-compose.yml`
 - backend smoke testing and startup documentation
