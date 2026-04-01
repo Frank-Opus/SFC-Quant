@@ -36,10 +36,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: Scaffold backend and frontend workspaces with consistent repo conventions
-- [ ] 01-02: Add `.env` contracts, settings loaders, and safe fallback modes
-- [ ] 01-03: Create `docker-compose.yml`, Dockerfiles, and healthcheck plumbing
-- [ ] 01-04: Write bootstrap instructions and verify local startup end to end
+- [ ] 01-01-PLAN.md — Scaffold backend and frontend workspaces with runtime shells and smoke verification
+- [ ] 01-02-PLAN.md — Add root env contracts, backend settings, and explicit mock-safe runtime visibility
+- [ ] 01-03-PLAN.md — Create Dockerfiles, `.dockerignore` files, and a two-service compose topology
+- [ ] 01-04-PLAN.md — Document bootstrap flow and add automated startup verification
 
 ### Phase 2: Market Data & Event Backbone
 **Goal**: Build the normalized market/event layer that both agents and dashboard depend on.
