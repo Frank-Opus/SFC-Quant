@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     exchange_api_key: str | None = None
     exchange_api_secret: str | None = None
 
+    execution_mode: str = "paper"
+    execution_adapter: str = "freqtrade_mock"
+    execution_engine_start_paused: bool = False
+    execution_paper_starting_balance: float = 10000.0
+    execution_order_notional_usd: float = 500.0
+    execution_fee_rate: float = 0.001
+    execution_max_recent_orders: int = 50
+
     frontend_api_url: str = Field(default="http://backend:8000")
     frontend_ws_url: str = Field(default="ws://backend:8000/ws")
     cors_allowed_origins: list[str] = Field(
@@ -52,6 +60,11 @@ class Settings(BaseSettings):
     @field_validator("ai_provider", mode="before")
     @classmethod
     def normalize_ai_provider(cls, value: str) -> str:
+        return str(value).strip().lower()
+
+    @field_validator("execution_mode", "execution_adapter", mode="before")
+    @classmethod
+    def normalize_execution_fields(cls, value: str) -> str:
         return str(value).strip().lower()
 
     @field_validator("cors_allowed_origins", mode="before")

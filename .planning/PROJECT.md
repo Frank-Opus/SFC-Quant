@@ -17,6 +17,7 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 - [x] Phase 1 validated the local monorepo runtime, env-driven startup, and two-service Compose baseline.
 - [x] Phase 2 validated normalized market snapshots, replayable JSONL events, and websocket delivery.
 - [x] Phase 3 validated a typed PrimoAgent core workflow with per-role outputs and a swappable provider seam.
+- [x] Phase 4 validated the paper-trading dispatch loop, execution lifecycle events, and pause/resume controls.
 
 ### Active
 
@@ -72,6 +73,8 @@ The system must run locally with minimal setup friction. That means a single rep
 | Refactor replay + websocket publication into a shared backend event bus in Phase 3 | Lets market, agent, and later execution/risk events share one inspectable local-first transport path | Accepted 2026-04-01 |
 | Implement Phase 3 AI orchestration as explicit typed role outputs behind a narrow provider factory | Preserves PrimoAgent explainability while keeping provider-specific logic out of routes and downstream phases | Accepted 2026-04-01 |
 | Keep the Phase 3 news/macro role honest about missing external evidence instead of fabricating sources | Protects explainability and operator trust until richer evidence ingestion lands in later phases | Accepted 2026-04-01 |
+| Add a paper-only execution service with a Freqtrade-shaped adapter seam before any live routing | Proves the signal-to-order control plane while preserving the product's safety-first boundary | Accepted 2026-04-01 |
+| Keep Phase 4 execution spot-style and long-only | Avoids inventing unsupported short/leverage behavior before risk and live-mode phases land | Accepted 2026-04-01 |
 
 ## Evolution
 

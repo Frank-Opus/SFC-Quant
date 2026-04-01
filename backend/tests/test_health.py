@@ -31,5 +31,7 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
     assert payload["runtime_mode"] == "mock-safe"
     assert payload["live_trading_enabled"] is False
     assert payload["app_mode"] == "mock"
+    assert payload["execution_mode"] == "paper"
+    assert payload["execution_adapter"] == "freqtrade_mock"
 
     get_settings.cache_clear()

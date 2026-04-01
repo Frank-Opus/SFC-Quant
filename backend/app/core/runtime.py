@@ -13,6 +13,8 @@ class RuntimeSnapshot(BaseModel):
     ai_provider: str
     ai_model: str | None
     exchange_id: str
+    execution_mode: str
+    execution_adapter: str
     ai_credentials_present: bool
     exchange_credentials_present: bool
     live_trading_requested: bool
@@ -73,6 +75,8 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
         ai_provider=settings.ai_provider,
         ai_model=settings.ai_model,
         exchange_id=settings.exchange_id,
+        execution_mode=settings.execution_mode,
+        execution_adapter=settings.execution_adapter,
         ai_credentials_present=ai_credentials_present,
         exchange_credentials_present=exchange_credentials_present,
         live_trading_requested=live_trading_requested,

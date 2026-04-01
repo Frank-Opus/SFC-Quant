@@ -14,6 +14,15 @@ EventType = Literal[
     "agent.analysis.requested",
     "agent.role.completed",
     "agent.analysis.completed",
+    "execution.signal.approved",
+    "execution.signal.skipped",
+    "execution.signal.blocked",
+    "execution.order.created",
+    "execution.order.submitted",
+    "execution.order.filled",
+    "execution.engine.paused",
+    "execution.engine.resumed",
+    "execution.position.updated",
 ]
 
 
