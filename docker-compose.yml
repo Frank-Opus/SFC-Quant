@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: dsfc-quant-backend
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_MODE: ${APP_MODE:-mock}
+      LIVE_TRADING_ENABLED: ${LIVE_TRADING_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-}
+      EXCHANGE_ID: ${EXCHANGE_ID:-binance}
+      EXCHANGE_API_KEY: ${EXCHANGE_API_KEY:-}
+      EXCHANGE_API_SECRET: ${EXCHANGE_API_SECRET:-}
+      FRONTEND_API_URL: ${FRONTEND_API_URL:-http://backend:8000}
+      FRONTEND_WS_URL: ${FRONTEND_WS_URL:-ws://backend:8000/ws}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import sys, urllib.request; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/health').status == 200 else sys.exit(1)\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: dsfc-quant-frontend
+    environment:
+      FRONTEND_API_URL: ${FRONTEND_API_URL:-http://backend:8000}
+      FRONTEND_WS_URL: ${FRONTEND_WS_URL:-ws://backend:8000/ws}
+      VITE_API_BASE_URL: ${FRONTEND_API_URL:-http://backend:8000}
+      VITE_WS_URL: ${FRONTEND_WS_URL:-ws://backend:8000/ws}
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
