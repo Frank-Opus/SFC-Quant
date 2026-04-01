@@ -1,0 +1,80 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-01T02:34:15.596Z",
+  "phase": "01",
+  "phase_name": "Foundation & Local Runtime",
+  "phase_dir": ".planning/phases/01-foundation-local-runtime",
+  "plan": 4,
+  "task": 1,
+  "total_tasks": 1,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "01-01 Scaffold backend/frontend shells",
+      "status": "done",
+      "commit": "0d4c180"
+    },
+    {
+      "id": 2,
+      "name": "01-02 Add env contracts and mock-safe runtime behavior",
+      "status": "done",
+      "commit": "917eb6f"
+    },
+    {
+      "id": 3,
+      "name": "01-03 Add Dockerfiles and two-service compose topology",
+      "status": "done",
+      "commit": "5ce45e0"
+    },
+    {
+      "id": 4,
+      "name": "01-04 Write bootstrap docs and verification artifacts",
+      "status": "done",
+      "commit": "2c391f9"
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 1,
+      "name": "Run Docker-enabled human verification for Phase 1",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Current machine has no docker CLI, so `docker compose up --build` could not be executed.",
+      "type": "external",
+      "workaround": "Move this folder to a machine with Docker, run the Compose bootstrap, then mark the UAT as approved or record failures."
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Run `cp .env.example .env && docker compose up --build` from repo root on a Docker-enabled machine and verify frontend/backend health.",
+      "context": "Phase 1 verification report is `human_needed` until real Compose startup is observed.",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Frontend foundation uses a custom React shell rather than a heavy admin/dashboard template.",
+      "rationale": "The product is a trading workstation, not a CRUD admin panel. Flexibility later is more important than template speed now.",
+      "phase": "01"
+    },
+    {
+      "decision": "Phase 1 defaults to mock-safe runtime with live trading forced off unless explicitly enabled later.",
+      "rationale": "Paper-first and local-safe behavior are mandatory project constraints.",
+      "phase": "01"
+    },
+    {
+      "decision": "Compose remains a two-service baseline: backend and frontend only.",
+      "rationale": "Phase 1 is intentionally lightweight and local-first.",
+      "phase": "01"
+    }
+  ],
+  "uncommitted_files": [
+    ".codex/"
+  ],
+  "next_action": "On the new machine, run the Docker-based human verification for Phase 1 first. Do not start Phase 2 until 01-HUMAN-UAT.md is resolved.",
+  "context_notes": "Implementation for Phase 1 is complete and committed. Automated verification passed (`pytest -q`, `npm run build`). The only open item is environmental verification with Docker. ROADMAP.md and STATE.md were intentionally left in a verifying/human-needed state so GSD does not incorrectly advance to Phase 2."
+}
