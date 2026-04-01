@@ -86,9 +86,13 @@ class ExecutionService:
         )
         self._positions: dict[str, PaperPosition] = {}
         self._last_run_id: str | None = None
+        self._risk_service = None
 
     async def initialize(self) -> None:
         return None
+
+    def set_risk_service(self, risk_service) -> None:
+        self._risk_service = risk_service
 
     def status(self) -> ExecutionStatusResponse:
         positions = list(self._positions.values())
@@ -180,6 +184,31 @@ class ExecutionService:
                 status=self.status(),
             )
 
+        preview_notional = round(
+            self._resolve_quantity(
+                symbol=analysis.symbol,
+                side=decision.side,
+                price=analysis.market_snapshot.last_price,
+            )
+            * analysis.market_snapshot.last_price,
+            8,
+        )
+        if self._risk_service is not None:
+            evaluation = await self._risk_service.evaluate_pretrade(
+                analysis=analysis,
+                execution_status=self.status(),
+                requested_notional=preview_notional,
+                current_position=self._positions.get(analysis.symbol),
+            )
+            if not evaluation.approved:
+                return ExecutionDispatchResult(
+                    engine_status="paused" if evaluation.should_halt else "running",
+                    message="; ".join(evaluation.reasons),
+                    analysis=analysis,
+                    order=None,
+                    status=self.status(),
+                )
+
         await self._event_bus.publish(
             event_type="execution.signal.approved",
             source="execution",
@@ -247,7 +276,13 @@ class ExecutionService:
             fee_rate=self._settings.execution_fee_rate,
         )
         self._recent_orders[-1] = filled_order
+        previous_position = self._positions.get(filled_order.symbol)
         await self._apply_fill(filled_order)
+        if self._risk_service is not None:
+            await self._risk_service.register_fill(
+                order=filled_order,
+                previous_position=previous_position,
+            )
         await self._event_bus.publish(
             event_type="execution.order.filled",
             source="execution",

@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Market Data & Event Backbone** - Normalize market data, define event contracts, and stream backend state. (completed 2026-04-01)
 - [x] **Phase 3: PrimoAgent Core Graph** - Build the multi-agent analysis and provider abstraction layer. (completed 2026-04-01)
 - [x] **Phase 4: Execution Engine & Paper Trading** - Integrate Freqtrade/ccxt into a realistic dry-run trade loop. (completed 2026-04-01)
-- [ ] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls.
+- [x] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls. (completed 2026-04-01)
 - [ ] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates.
 - [ ] **Phase 7: Advanced Visual Analytics** - Add heatmap, factor radar, richer overlays, and premium signal UX.
 - [ ] **Phase 8: Strategy Factory & Macro Extensions** - Add optional RD-Agent(Q) workflow and deeper news/macro evidence panels.
@@ -104,10 +104,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 05-01: Implement risk-policy schemas and server-side enforcement
-- [ ] 05-02: Add trade-approval workflow between agents and execution
-- [ ] 05-03: Add global halt / kill-switch behavior for breached limits
-- [ ] 05-04: Add guarded live-mode enablement flow and audit events
+- [x] 05-01: Implement risk-policy schemas and server-side enforcement
+- [x] 05-02: Add trade-approval workflow between agents and execution
+- [x] 05-03: Add global halt / kill-switch behavior for breached limits
+- [x] 05-04: Add guarded live-mode enablement flow and audit events
 
 ### Phase 6: Pro Trading Dashboard Shell
 **Goal**: Deliver the operator dashboard shell with premium controls, KPI cards, and live chart surfaces.
@@ -188,7 +188,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. Market Data & Event Backbone | 4/4 | Complete    | 2026-04-01 |
 | 3. PrimoAgent Core Graph | 4/4 | Complete    | 2026-04-01 |
 | 4. Execution Engine & Paper Trading | 4/4 | Complete    | 2026-04-01 |
-| 5. Risk Guardrails & Live Gating | 0/4 | Not started | - |
+| 5. Risk Guardrails & Live Gating | 4/4 | Complete    | 2026-04-01 |
 | 6. Pro Trading Dashboard Shell | 0/5 | Not started | - |
 | 7. Advanced Visual Analytics | 0/3 | Not started | - |
 | 8. Strategy Factory & Macro Extensions | 0/4 | Not started | - |

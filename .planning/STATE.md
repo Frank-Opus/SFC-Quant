@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 4 completed with paper-trading dispatch, execution lifecycle events, and pause/resume control; Phase 5 ready for planning
-last_updated: "2026-04-01T07:15:00Z"
+stopped_at: Phase 5 completed with risk policy enforcement, approval gating, auto-halt, and guarded live-mode enablement; Phase 6 ready for planning
+last_updated: "2026-04-01T08:10:00Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 40
-  completed_plans: 16
-  percent: 40
+  completed_plans: 20
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
-**Current focus:** Phase 05 — risk-guardrails-live-gating
+**Current focus:** Phase 06 — pro-trading-dashboard-shell
 
 ## Current Position
 
-Phase: 5
+Phase: 6
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-04-01 — Phase 4 completed with paper-trade dispatch, order lifecycle events, and operator execution controls
+Last activity: 2026-04-01 — Phase 5 completed with server-side risk guardrails, trade-approval enforcement, auto-halt, and live-mode gating
 
-Progress: [████░░░░░░] 40%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 4]: Add a paper-only execution service and Freqtrade-shaped adapter seam
 - [Phase 4]: Publish execution lifecycle events through the shared replayable event bus
 - [Phase 4]: Expose manual pause/resume execution control through backend APIs
+- [Phase 5]: Centralize guardrails and live-mode state in a dedicated RiskService
+- [Phase 5]: Enforce risk approval before execution when the guard is enabled
+- [Phase 5]: Auto-halt execution on hard-policy or daily-loss breaches
 
 ### Pending Todos
 
@@ -79,10 +82,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Exact risk policy persistence and live-mode confirmation UX need validation during Phase 5 planning
+- Exact dashboard information architecture and reconnect UX need validation during Phase 6 planning
 
 ## Session Continuity
 
-Last session: 2026-04-01 15:15 CST
-Stopped at: Phase 4 shipped; next recommended action is planning Phase 5
+Last session: 2026-04-01 16:10 CST
+Stopped at: Phase 5 shipped; next recommended action is planning Phase 6
 Resume file: None

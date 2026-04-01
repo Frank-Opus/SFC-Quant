@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     execution_fee_rate: float = 0.001
     execution_max_recent_orders: int = 50
 
+    risk_max_position_notional_usd: float = 1000.0
+    risk_max_concurrent_trades: int = 3
+    risk_daily_loss_limit_usd: float = 250.0
+    risk_blocked_symbols: list[str] = Field(default_factory=list)
+    risk_require_agent_approval: bool = True
+    risk_min_approval_confidence: float = 0.55
+
     frontend_api_url: str = Field(default="http://backend:8000")
     frontend_ws_url: str = Field(default="ws://backend:8000/ws")
     cors_allowed_origins: list[str] = Field(
@@ -74,7 +81,7 @@ class Settings(BaseSettings):
             return [item.strip() for item in value if item.strip()]
         return [item.strip() for item in str(value).split(",") if item.strip()]
 
-    @field_validator("market_symbols", "market_timeframes", mode="before")
+    @field_validator("market_symbols", "market_timeframes", "risk_blocked_symbols", mode="before")
     @classmethod
     def normalize_csv_lists(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, list):

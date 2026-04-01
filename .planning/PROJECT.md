@@ -18,6 +18,7 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 - [x] Phase 2 validated normalized market snapshots, replayable JSONL events, and websocket delivery.
 - [x] Phase 3 validated a typed PrimoAgent core workflow with per-role outputs and a swappable provider seam.
 - [x] Phase 4 validated the paper-trading dispatch loop, execution lifecycle events, and pause/resume controls.
+- [x] Phase 5 validated server-side risk guardrails, approval gating, auto-halt behavior, and guarded live-mode enablement.
 
 ### Active
 
@@ -75,6 +76,8 @@ The system must run locally with minimal setup friction. That means a single rep
 | Keep the Phase 3 news/macro role honest about missing external evidence instead of fabricating sources | Protects explainability and operator trust until richer evidence ingestion lands in later phases | Accepted 2026-04-01 |
 | Add a paper-only execution service with a Freqtrade-shaped adapter seam before any live routing | Proves the signal-to-order control plane while preserving the product's safety-first boundary | Accepted 2026-04-01 |
 | Keep Phase 4 execution spot-style and long-only | Avoids inventing unsupported short/leverage behavior before risk and live-mode phases land | Accepted 2026-04-01 |
+| Centralize mutable guardrails and live-mode state in a dedicated RiskService | Keeps policy enforcement auditable and reusable across execution, UI, and later live-routing flows | Accepted 2026-04-01 |
+| Require explicit confirmation text plus non-mock runtime and credentials before live mode can enable | Makes accidental real-money routing materially harder | Accepted 2026-04-01 |
 
 ## Evolution
 

@@ -10,7 +10,7 @@ Standalone AI/Agent quant trading platform focused on local-first operation, exp
 - `frontend/` — Vite + React shell for the custom trading workstation UI
 - `docker-compose.yml` — one-command local startup for `backend` and `frontend`
 
-The repo now includes the Phase 1 local runtime foundation, the Phase 2 market-data/event backbone, the Phase 3 PrimoAgent analysis core, and the Phase 4 paper-trading execution loop. Live-risk gating and the final pro dashboard still land in later phases.
+The repo now includes the Phase 1 local runtime foundation, the Phase 2 market-data/event backbone, the Phase 3 PrimoAgent analysis core, the Phase 4 paper-trading execution loop, and the Phase 5 server-side risk guardrails/live-gating layer. The final pro dashboard still lands in later phases.
 
 ## Tech Stack
 
@@ -54,6 +54,10 @@ Important keys:
 - `EXECUTION_ADAPTER=freqtrade_mock`
 - `EXECUTION_PAPER_STARTING_BALANCE=10000`
 - `EXECUTION_ORDER_NOTIONAL_USD=500`
+- `RISK_MAX_POSITION_NOTIONAL_USD=1000`
+- `RISK_MAX_CONCURRENT_TRADES=3`
+- `RISK_DAILY_LOSS_LIMIT_USD=250`
+- `RISK_REQUIRE_AGENT_APPROVAL=true`
 - `FRONTEND_API_URL=http://backend:8000`
 - `FRONTEND_WS_URL=ws://backend:8000/ws`
 - `MARKET_SYMBOLS=BTC/USDT,ETH/USDT`
@@ -71,7 +75,7 @@ The platform still defaults to `mock-safe` startup:
 - `AI_PROVIDER=mock` allows startup without third-party AI credentials
 - Set `AI_PROVIDER=openai_compatible` together with `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` to call an OpenAI-compatible vendor
 
-The backend exposes the resolved runtime state through `/health`, serves normalized market state from `/api/market/snapshot`, replayable recent events from `/api/events/recent`, supports on-demand multi-agent analysis through `POST /api/analysis/run`, exposes paper-trading control/status routes under `/api/execution/*`, returns the last stored analysis through `/api/analysis/latest`, and streams live updates over `/ws`.
+The backend exposes the resolved runtime state through `/health`, serves normalized market state from `/api/market/snapshot`, replayable recent events from `/api/events/recent`, supports on-demand multi-agent analysis through `POST /api/analysis/run`, exposes paper-trading control/status routes under `/api/execution/*`, exposes risk policy/live-gating controls under `/api/risk/*`, returns the last stored analysis through `/api/analysis/latest`, and streams live updates over `/ws`.
 
 ## Current Phase Scope
 
@@ -87,6 +91,7 @@ Current shipped scope includes:
 - swappable AI provider boundary with mock and OpenAI-compatible modes
 - on-demand multi-agent analysis persistence and latest-result retrieval
 - paper-trading execution status, lifecycle events, and operator pause/resume control
+- configurable server-side risk limits, risk-approval enforcement, kill-switch halt, and guarded live-mode enablement
 - frontend live market monitoring shell
 - Dockerfiles and a two-service `docker-compose.yml`
 - backend smoke testing and startup documentation
@@ -96,7 +101,7 @@ Still intentionally excluded:
 - PrimoAgent role orchestration
 - live trading enablement flows
 - the full trader dashboard and analytics surfaces
-- guarded live trading and hard risk policies
+- full dashboard execution/risk UX
 
 ## Local Development
 

@@ -23,6 +23,13 @@ EventType = Literal[
     "execution.engine.paused",
     "execution.engine.resumed",
     "execution.position.updated",
+    "risk.policy.updated",
+    "risk.approval.granted",
+    "risk.approval.denied",
+    "risk.halt.triggered",
+    "risk.halt.cleared",
+    "risk.live_mode.enabled",
+    "risk.live_mode.disabled",
 ]
 
 

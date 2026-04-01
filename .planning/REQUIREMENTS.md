@@ -98,10 +98,10 @@
 | EXEC-01 | Phase 4 | Satisfied |
 | EXEC-03 | Phase 4 | Satisfied |
 | EXEC-04 | Phase 4 | Satisfied |
-| EXEC-02 | Phase 5 | Pending |
-| RISK-01 | Phase 5 | Pending |
-| RISK-02 | Phase 5 | Pending |
-| RISK-03 | Phase 5 | Pending |
+| EXEC-02 | Phase 5 | Satisfied |
+| RISK-01 | Phase 5 | Satisfied |
+| RISK-02 | Phase 5 | Satisfied |
+| RISK-03 | Phase 5 | Satisfied |
 | DASH-01 | Phase 6 | Pending |
 | DASH-02 | Phase 6 | Pending |
 | DASH-04 | Phase 6 | Pending |
