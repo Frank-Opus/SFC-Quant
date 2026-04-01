@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Scaffold backend and frontend workspaces with runtime shells and smoke verification
 - [x] 01-02-PLAN.md — Add root env contracts, backend settings, and explicit mock-safe runtime visibility
-- [ ] 01-03-PLAN.md — Create Dockerfiles, `.dockerignore` files, and a two-service compose topology
+- [x] 01-03-PLAN.md — Create Dockerfiles, `.dockerignore` files, and a two-service compose topology
 - [ ] 01-04-PLAN.md — Document bootstrap flow and add automated startup verification
 
 ### Phase 2: Market Data & Event Backbone
