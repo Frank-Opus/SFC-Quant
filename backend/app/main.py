@@ -10,6 +10,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.market import router as market_router
 from app.api.routes.risk import router as risk_router
 from app.api.routes.realtime import router as realtime_router
+from app.api.routes.strategy import router as strategy_router
 from app.core.config import get_settings
 from app.core.runtime import resolve_runtime
 from app.services.event_store import JsonlEventStore
@@ -20,6 +21,7 @@ from app.services.market import MarketRuntimeService
 from app.services.providers import ProviderFactory
 from app.services.risk import RiskService
 from app.services.realtime import WebSocketHub
+from app.services.strategy_factory import StrategyFactoryService
 
 
 @asynccontextmanager
@@ -52,6 +54,11 @@ async def lifespan(app: FastAPI):
         event_bus=event_bus,
         pause_execution=execution_service.pause,
     )
+    strategy_factory_service = StrategyFactoryService(
+        settings=settings,
+        event_bus=event_bus,
+        analysis_service=analysis_service,
+    )
     execution_service.set_risk_service(risk_service)
 
     app.state.websocket_hub = websocket_hub
@@ -60,11 +67,13 @@ async def lifespan(app: FastAPI):
     app.state.analysis_service = analysis_service
     app.state.execution_service = execution_service
     app.state.risk_service = risk_service
+    app.state.strategy_factory_service = strategy_factory_service
 
     await market_service.initialize()
     await analysis_service.initialize()
     await execution_service.initialize()
     await risk_service.initialize()
+    await strategy_factory_service.initialize()
     try:
         yield
     finally:
@@ -92,6 +101,7 @@ app.include_router(analysis_router)
 app.include_router(execution_router)
 app.include_router(risk_router)
 app.include_router(realtime_router)
+app.include_router(strategy_router)
 
 
 @app.get("/")
@@ -103,5 +113,10 @@ def root() -> dict[str, object]:
         "symbols": settings.market_symbols,
         "timeframes": settings.market_timeframes,
         "event_log_dir": settings.event_log_dir,
+    }
+    runtime["strategy_factory"] = {
+        "enabled": settings.strategy_factory_enabled,
+        "provider": settings.strategy_factory_provider,
+        "workspace": settings.strategy_factory_workspace,
     }
     return runtime

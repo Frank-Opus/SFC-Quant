@@ -13,6 +13,9 @@ from app.models.analysis import (
     AnalysisRunStatus,
     AnalysisTrigger,
     EvidencePoint,
+    MacroCatalyst,
+    MacroThesis,
+    MacroWatchItem,
     ProviderAnalysisDraft,
     SourceReference,
 )
@@ -151,7 +154,11 @@ class AnalysisService:
         status: AnalysisRunStatus = "completed"
         try:
             if isinstance(provider, MockAIProvider):
-                draft = self._mock_output(role=role, market_snapshot=market_snapshot, prior_outputs=prior_outputs)
+                draft = self._mock_output(
+                    role=role,
+                    market_snapshot=market_snapshot,
+                    prior_outputs=prior_outputs,
+                )
             else:
                 draft = await provider.generate(
                     role=role,
@@ -170,7 +177,11 @@ class AnalysisService:
                 },
             )
             provider = MockAIProvider()
-            draft = self._mock_output(role=role, market_snapshot=market_snapshot, prior_outputs=prior_outputs)
+            draft = self._mock_output(
+                role=role,
+                market_snapshot=market_snapshot,
+                prior_outputs=prior_outputs,
+            )
 
         latency_ms = int((time.perf_counter() - started) * 1000)
         result = AgentAnalysisResult(
@@ -198,10 +209,12 @@ class AnalysisService:
         return (
             "You are one role inside a PrimoAgent trading workflow. "
             f"Current role: {role}. Respond with one JSON object only. "
-            "Schema: signal_bias, recommendation, confidence, summary, rationale, evidence, sources. "
+            "Schema: signal_bias, recommendation, confidence, summary, rationale, evidence, sources, optional macro_thesis. "
             "confidence must be between 0 and 1. rationale must contain 2-4 concise strings. "
             "evidence is a list of objects with label, detail, kind. sources is a list of objects with title, kind, optional url, optional note. "
-            "Be explainable, conservative, and avoid hallucinating unavailable data."
+            "macro_thesis is only required for the news_geopolitics role and contains regime, stance, summary, catalysts, watch_items. "
+            "Be explainable, conservative, and avoid hallucinating unavailable data. "
+            "If evidence is simulated or reference-only, say so explicitly in notes and rationale."
         )
 
     def _build_user_prompt(
@@ -232,7 +245,9 @@ class AnalysisService:
         role_guidance = {
             "data": "Focus on price, trend, and observable market-state quality.",
             "technical_analysis": "Focus on candle structure, momentum, and tactical setup.",
-            "news_geopolitics": "Focus on macro/news risk context. If no source-linked news exists, say so explicitly.",
+            "news_geopolitics": (
+                "Focus on macro/news risk context. Provide source-linked evidence, and if sources are reference-only or simulated, say so explicitly."
+            ),
             "risk_decision": "Synthesize the earlier roles into a cautious trading recommendation.",
         }
         lines.append(f"role_guidance: {role_guidance[role]}")
@@ -251,7 +266,11 @@ class AnalysisService:
         bias = _bias_from_change(change)
         recommendation: ActionRecommendation = _recommendation_from_bias(bias)
         trend_text = (
-            "upward momentum" if change > 0.4 else "downward pressure" if change < -0.4 else "range-bound conditions"
+            "upward momentum"
+            if change > 0.4
+            else "downward pressure"
+            if change < -0.4
+            else "range-bound conditions"
         )
         candles = market_snapshot.candles
         recent_close = candles[-1].close if candles else market_snapshot.last_price
@@ -278,11 +297,23 @@ class AnalysisService:
                 evidence=[
                     EvidencePoint(label="Last price", detail=str(market_snapshot.last_price), kind="market"),
                     EvidencePoint(label="Change", detail=f"{change}%", kind="market"),
-                    EvidencePoint(label="Relative close", detail=f"Recent close is {relative_position} average close", kind="market"),
+                    EvidencePoint(
+                        label="Relative close",
+                        detail=f"Recent close is {relative_position} average close",
+                        kind="market",
+                    ),
                 ],
                 sources=[
-                    SourceReference(title="Normalized market snapshot", kind="internal", note="Phase 2 market backbone"),
-                    SourceReference(title=market_snapshot.exchange_id, kind="exchange", note=market_snapshot.source),
+                    SourceReference(
+                        title="Normalized market snapshot",
+                        kind="internal",
+                        note="Phase 2 market backbone",
+                    ),
+                    SourceReference(
+                        title=market_snapshot.exchange_id,
+                        kind="exchange",
+                        note=market_snapshot.source,
+                    ),
                 ],
             )
 
@@ -299,37 +330,101 @@ class AnalysisService:
                 ],
                 evidence=[
                     EvidencePoint(label="Candle count", detail=str(len(candles)), kind="technical"),
-                    EvidencePoint(label="Sample average close", detail=str(round(average_close, 2)), kind="technical"),
-                    EvidencePoint(label="Recent close", detail=str(round(recent_close, 2)), kind="technical"),
+                    EvidencePoint(
+                        label="Sample average close",
+                        detail=str(round(average_close, 2)),
+                        kind="technical",
+                    ),
+                    EvidencePoint(
+                        label="Recent close",
+                        detail=str(round(recent_close, 2)),
+                        kind="technical",
+                    ),
                 ],
                 sources=[
-                    SourceReference(title="Phase 2 OHLCV snapshot", kind="internal", note="No external indicator engine yet"),
+                    SourceReference(
+                        title="Phase 2 OHLCV snapshot",
+                        kind="internal",
+                        note="No external indicator engine yet",
+                    ),
                 ],
             )
 
         if role == "news_geopolitics":
-            caution_bias = "cautious" if abs_change > 2 else "neutral"
+            macro_thesis = _build_mock_macro_thesis(market_snapshot)
+            caution_bias = macro_thesis.stance
             return ProviderAnalysisDraft(
                 signal_bias=caution_bias,
-                recommendation="wait" if abs_change > 2 else "hold",
-                confidence=0.38,
-                summary="No live news feed is integrated yet, so macro context remains a constrained placeholder.",
+                recommendation="wait" if caution_bias == "cautious" else "hold",
+                confidence=0.58 if caution_bias != "cautious" else 0.49,
+                summary=macro_thesis.summary,
                 rationale=[
-                    "Phase 3 does not yet include source-linked news ingestion.",
-                    "The workflow should explicitly surface missing macro evidence instead of fabricating headlines.",
-                    "Risk weighting stays conservative until Phase 8 macro extensions land.",
+                    "Phase 8 now exposes reviewable macro context even when the runtime is still operating in local mock mode.",
+                    "Reference links point operators to canonical macro/news desks, but the platform is explicit that they are not live-ingested headlines.",
+                    "Macro conviction is deliberately capped until a real external ingestion pipeline lands in a later phase.",
                 ],
                 evidence=[
-                    EvidencePoint(label="Macro coverage", detail="No external news provider attached", kind="macro"),
-                    EvidencePoint(label="Policy", detail="Missing evidence downgrades conviction", kind="risk"),
+                    EvidencePoint(
+                        label="Liquidity sensitivity",
+                        detail=(
+                            f"{market_snapshot.symbol} moved {change}% over the sampled window, so macro beta remains relevant to intraday positioning."
+                        ),
+                        kind="macro",
+                    ),
+                    EvidencePoint(
+                        label="Volatility posture",
+                        detail=(
+                            "Expanded short-window volatility shifts the thesis toward patience and tighter risk framing."
+                            if abs_change > 2
+                            else "Volatility remains moderate enough for a watchful rather than defensive macro posture."
+                        ),
+                        kind="risk",
+                    ),
+                    EvidencePoint(
+                        label="Coverage mode",
+                        detail="Source links are reference anchors plus local synthesis; no live headline ingestion is active yet.",
+                        kind="news",
+                    ),
                 ],
                 sources=[
-                    SourceReference(title="Macro/news feed pending", kind="internal", note="Planned for Phase 8"),
+                    SourceReference(
+                        title="Federal Reserve - Monetary Policy",
+                        kind="macro",
+                        url="https://www.federalreserve.gov/monetarypolicy.htm",
+                        note="Reference anchor only in mock mode.",
+                    ),
+                    SourceReference(
+                        title="FRED Macro Data",
+                        kind="macro",
+                        url="https://fred.stlouisfed.org/",
+                        note="Operator review source for rates/liquidity context.",
+                    ),
+                    SourceReference(
+                        title="Reuters Markets",
+                        kind="news",
+                        url="https://www.reuters.com/markets/",
+                        note="Reference news desk; not directly ingested by the backend.",
+                    ),
+                    SourceReference(
+                        title="Local thesis synthesis",
+                        kind="internal",
+                        note="Derived from current market snapshot plus prior PrimoAgent role outputs.",
+                    ),
                 ],
+                macro_thesis=macro_thesis,
             )
 
         decision = _synthesize_recommendation(prior_outputs or [])
         decision_bias = _bias_from_recommendation(decision)
+        macro_role = next(
+            (output for output in prior_outputs if output.role == "news_geopolitics"),
+            None,
+        )
+        macro_note = (
+            macro_role.macro_thesis.summary
+            if macro_role and macro_role.macro_thesis is not None
+            else "Macro posture remains incomplete."
+        )
         return ProviderAnalysisDraft(
             signal_bias=decision_bias,
             recommendation=decision,
@@ -337,21 +432,92 @@ class AnalysisService:
             summary=f"Risk decision recommends {decision} after combining market, technical, and macro confidence bands.",
             rationale=[
                 f"Data and technical outputs currently lean toward {_summarize_prior_bias(prior_outputs)}.",
-                "Macro/news coverage is incomplete, which caps conviction and favors conservative actions.",
-                "The risk role keeps paper-trading posture front and center for Phase 3.",
+                macro_note,
+                "The risk role keeps paper-trading posture front and center and only escalates when the multi-role stack is aligned.",
             ],
             evidence=[
                 EvidencePoint(label="Consensus", detail=_summarize_prior_bias(prior_outputs), kind="risk"),
-                EvidencePoint(label="Macro gap", detail="News evidence not yet integrated", kind="risk"),
+                EvidencePoint(
+                    label="Macro posture",
+                    detail=macro_note,
+                    kind="risk",
+                ),
             ],
             sources=[
-                SourceReference(title="PrimoAgent role outputs", kind="internal", note="Synthesized by risk role"),
+                SourceReference(
+                    title="PrimoAgent role outputs",
+                    kind="internal",
+                    note="Synthesized by risk role",
+                ),
             ],
         )
 
     @staticmethod
     def _key(symbol: str, timeframe: str) -> str:
         return f"{symbol}:{timeframe}"
+
+
+def _build_mock_macro_thesis(market_snapshot: MarketSnapshot) -> MacroThesis:
+    change = market_snapshot.change_percent
+    abs_change = abs(change)
+    stance = "bullish" if change >= 1.5 else "bearish" if change <= -1.5 else "cautious" if abs_change > 2 else "neutral"
+    regime = (
+        "risk-on but headline-sensitive"
+        if change >= 1.0
+        else "fragile risk appetite"
+        if change <= -1.0
+        else "balanced macro tape"
+    )
+    summary = (
+        "Macro context is constructive but still headline-sensitive; reference macro sources support a watchful risk-on stance."
+        if stance == "bullish"
+        else "Macro context leans defensive; volatility and policy uncertainty argue for patience before fresh risk is added."
+        if stance in {"bearish", "cautious"}
+        else "Macro context is balanced, so thesis conviction depends more on market structure than on a decisive cross-asset catalyst."
+    )
+    catalysts = [
+        MacroCatalyst(
+            label="Rates and liquidity backdrop",
+            detail="Policy path and liquidity conditions remain the main macro throttle for crypto beta.",
+            impact="cautious" if abs_change > 2 else "neutral",
+            horizon="macro",
+        ),
+        MacroCatalyst(
+            label="Cross-asset risk appetite",
+            detail=(
+                "Recent upside suggests traders are willing to pay for beta again."
+                if change > 0
+                else "Recent downside suggests fast-money appetite is fading."
+            ),
+            impact="bullish" if change > 0.6 else "bearish" if change < -0.6 else "neutral",
+            horizon="swing",
+        ),
+        MacroCatalyst(
+            label="Crypto-specific news sensitivity",
+            detail="Until direct ingestion exists, operators should cross-check any ETF, regulation, or exchange headlines manually.",
+            impact="cautious",
+            horizon="intraday",
+        ),
+    ]
+    watch_items = [
+        MacroWatchItem(
+            label="Policy repricing",
+            trigger="A sharp rates narrative shift or surprise central-bank guidance.",
+            implication="Would tighten risk appetite and lower conviction for immediate adds.",
+        ),
+        MacroWatchItem(
+            label="Market breadth confirmation",
+            trigger="Broad upside participation across tracked pairs instead of a single-symbol move.",
+            implication="Would improve confidence that the thesis is not just isolated noise.",
+        ),
+    ]
+    return MacroThesis(
+        regime=regime,
+        stance=stance,
+        summary=summary,
+        catalysts=catalysts,
+        watch_items=watch_items,
+    )
 
 
 def _bias_from_change(change: float) -> str:

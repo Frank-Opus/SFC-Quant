@@ -23,7 +23,7 @@
 - [ ] **AGENT-02**: User can inspect each agent’s latest rationale, confidence, and status.
 - [ ] **AGENT-03**: User can trigger an on-demand multi-agent analysis for a selected symbol.
 - [ ] **AGENT-04**: User can connect supported third-party AI providers to the agent workflow through a common backend provider layer.
-- [ ] **AGENT-05**: User can inspect source-linked macro/news context that contributed to a trade thesis.
+- [x] **AGENT-05**: User can inspect source-linked macro/news context that contributed to a trade thesis.
 
 ### Execution
 
@@ -52,8 +52,8 @@
 
 ### Strategy Factory
 
-- [ ] **STRAT-01**: User can enable or disable RD-Agent(Q)-based strategy generation as an optional subsystem.
-- [ ] **STRAT-02**: Developer can store generated strategy artifacts in a reviewable workspace before runtime use.
+- [x] **STRAT-01**: User can enable or disable RD-Agent(Q)-based strategy generation as an optional subsystem.
+- [x] **STRAT-02**: Developer can store generated strategy artifacts in a reviewable workspace before runtime use.
 
 ### Operations
 
@@ -107,9 +107,9 @@
 | DASH-04 | Phase 6 | Satisfied |
 | WS-02 | Phase 6 | Satisfied |
 | DASH-03 | Phase 7 | Satisfied |
-| AGENT-05 | Phase 8 | Pending |
-| STRAT-01 | Phase 8 | Pending |
-| STRAT-02 | Phase 8 | Pending |
+| AGENT-05 | Phase 8 | Satisfied |
+| STRAT-01 | Phase 8 | Satisfied |
+| STRAT-02 | Phase 8 | Satisfied |
 | OPS-02 | Phase 9 | Pending |
 | OPS-03 | Phase 9 | Pending |
 
@@ -120,4 +120,4 @@
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 after Phase 7*
+*Last updated: 2026-04-01 after Phase 8*

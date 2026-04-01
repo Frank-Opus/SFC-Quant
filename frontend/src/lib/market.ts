@@ -59,6 +59,40 @@ export type AgentRole =
   | "news_geopolitics"
   | "risk_decision";
 
+export type EvidencePoint = {
+  label: string;
+  detail: string;
+  kind: "market" | "technical" | "news" | "macro" | "risk" | "internal";
+};
+
+export type SourceReference = {
+  title: string;
+  kind: "exchange" | "macro" | "news" | "internal" | "provider";
+  url: string | null;
+  note: string | null;
+};
+
+export type MacroCatalyst = {
+  label: string;
+  detail: string;
+  impact: "bullish" | "bearish" | "neutral" | "cautious";
+  horizon: "intraday" | "swing" | "macro";
+};
+
+export type MacroWatchItem = {
+  label: string;
+  trigger: string;
+  implication: string;
+};
+
+export type MacroThesis = {
+  regime: string;
+  stance: "bullish" | "bearish" | "neutral" | "cautious";
+  summary: string;
+  catalysts: MacroCatalyst[];
+  watch_items: MacroWatchItem[];
+};
+
 export type AgentAnalysisResult = {
   role: AgentRole;
   status: "completed" | "fallback";
@@ -71,6 +105,9 @@ export type AgentAnalysisResult = {
   confidence: number;
   summary: string;
   rationale: string[];
+  evidence: EvidencePoint[];
+  sources: SourceReference[];
+  macro_thesis: MacroThesis | null;
 };
 
 export type AnalysisRunResult = {
@@ -154,6 +191,42 @@ export type RiskStatusResponse = {
   live_mode_reason: string | null;
 };
 
+export type StrategyArtifactFile = {
+  path: string;
+  kind: "markdown" | "json" | "python";
+};
+
+export type StrategyArtifact = {
+  artifact_id: string;
+  symbol: string;
+  timeframe: string;
+  run_id: string;
+  created_at: string;
+  configured_provider: string;
+  effective_provider: "mock_rdq" | "rd_agent_q" | "external";
+  recommendation: "buy" | "sell" | "hold" | "reduce" | "wait";
+  summary: string;
+  directory: string;
+  files: StrategyArtifactFile[];
+};
+
+export type StrategyFactoryStatusResponse = {
+  enabled: boolean;
+  configured_provider: string;
+  effective_provider: "mock_rdq" | "rd_agent_q" | "external";
+  workspace: string;
+  auto_generate: boolean;
+  reason: string | null;
+  artifact_count: number;
+  latest_artifact: StrategyArtifact | null;
+};
+
+export type StrategyGenerationResponse = {
+  message: string;
+  artifact: StrategyArtifact;
+  status: StrategyFactoryStatusResponse;
+};
+
 export const fallbackRuntimeSnapshot: RuntimeSnapshot = {
   name: "dSFC-Quant",
   service: "backend",
@@ -219,6 +292,17 @@ export const fallbackRiskStatus: RiskStatusResponse = {
   live_mode_reason: "Risk runtime unavailable.",
 };
 
+export const fallbackStrategyStatus: StrategyFactoryStatusResponse = {
+  enabled: false,
+  configured_provider: "mock_rdq",
+  effective_provider: "mock_rdq",
+  workspace: "./var/strategy_factory",
+  auto_generate: false,
+  reason: "Strategy Factory runtime unavailable.",
+  artifact_count: 0,
+  latest_artifact: null,
+};
+
 function readEnvValue(key: "VITE_API_BASE_URL" | "VITE_WS_URL"): string | undefined {
   const value = import.meta.env[key];
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
@@ -267,7 +351,16 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`${path} failed with ${response.status}`);
+    let detail = `${path} failed with ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Ignore parsing errors and keep the HTTP status fallback.
+    }
+    throw new Error(detail);
   }
 
   return (await response.json()) as T;
@@ -294,6 +387,37 @@ export async function loadRiskStatus(): Promise<RiskStatusResponse> {
     return await requestJson<RiskStatusResponse>("/api/risk/status");
   } catch {
     return fallbackRiskStatus;
+  }
+}
+
+export async function loadStrategyStatus(): Promise<StrategyFactoryStatusResponse> {
+  try {
+    return await requestJson<StrategyFactoryStatusResponse>("/api/strategy/status");
+  } catch {
+    return fallbackStrategyStatus;
+  }
+}
+
+export async function loadStrategyArtifacts(params?: {
+  symbol?: string;
+  timeframe?: string;
+  limit?: number;
+}): Promise<StrategyArtifact[]> {
+  const search = new URLSearchParams();
+  if (params?.symbol) {
+    search.set("symbol", params.symbol);
+  }
+  if (params?.timeframe) {
+    search.set("timeframe", params.timeframe);
+  }
+  if (params?.limit) {
+    search.set("limit", String(params.limit));
+  }
+  const suffix = search.size > 0 ? `?${search.toString()}` : "";
+  try {
+    return await requestJson<StrategyArtifact[]>(`/api/strategy/artifacts${suffix}`);
+  } catch {
+    return [];
   }
 }
 
@@ -356,6 +480,28 @@ export async function requestLiveMode(payload: {
   confirmation_text?: string;
 }): Promise<RiskStatusResponse> {
   return requestJson<RiskStatusResponse>("/api/risk/live-mode", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateStrategyConfig(payload: {
+  enabled?: boolean;
+  provider?: string;
+  auto_generate?: boolean;
+}): Promise<StrategyFactoryStatusResponse> {
+  return requestJson<StrategyFactoryStatusResponse>("/api/strategy/config", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function generateStrategyArtifact(payload: {
+  symbol: string;
+  timeframe: string;
+  notes?: string;
+}): Promise<StrategyGenerationResponse> {
+  return requestJson<StrategyGenerationResponse>("/api/strategy/generate", {
     method: "POST",
     body: JSON.stringify(payload),
   });

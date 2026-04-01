@@ -17,6 +17,8 @@ ActionRecommendation = Literal["buy", "sell", "hold", "reduce", "wait"]
 SourceKind = Literal["market", "technical", "news", "macro", "risk", "internal"]
 AgentOutputStatus = Literal["completed", "fallback"]
 AnalysisRunStatus = Literal["completed", "fallback"]
+MacroImpact = Literal["bullish", "bearish", "neutral", "cautious"]
+MacroHorizon = Literal["intraday", "swing", "macro"]
 
 
 class EvidencePoint(BaseModel):
@@ -32,6 +34,27 @@ class SourceReference(BaseModel):
     note: str | None = None
 
 
+class MacroCatalyst(BaseModel):
+    label: str
+    detail: str
+    impact: MacroImpact
+    horizon: MacroHorizon
+
+
+class MacroWatchItem(BaseModel):
+    label: str
+    trigger: str
+    implication: str
+
+
+class MacroThesis(BaseModel):
+    regime: str
+    stance: SignalBias
+    summary: str
+    catalysts: list[MacroCatalyst] = Field(default_factory=list)
+    watch_items: list[MacroWatchItem] = Field(default_factory=list)
+
+
 class ProviderAnalysisDraft(BaseModel):
     signal_bias: SignalBias
     recommendation: ActionRecommendation
@@ -40,6 +63,7 @@ class ProviderAnalysisDraft(BaseModel):
     rationale: list[str] = Field(default_factory=list)
     evidence: list[EvidencePoint] = Field(default_factory=list)
     sources: list[SourceReference] = Field(default_factory=list)
+    macro_thesis: MacroThesis | None = None
 
 
 class AgentAnalysisResult(ProviderAnalysisDraft):

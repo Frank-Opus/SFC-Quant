@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls. (completed 2026-04-01)
 - [x] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates. (completed 2026-04-01)
 - [x] **Phase 7: Advanced Visual Analytics** - Add heatmap, factor radar, richer overlays, and premium signal UX. (completed 2026-04-01)
-- [ ] **Phase 8: Strategy Factory & Macro Extensions** - Add optional RD-Agent(Q) workflow and deeper news/macro evidence panels.
+- [x] **Phase 8: Strategy Factory & Macro Extensions** - Add optional RD-Agent(Q) workflow and deeper news/macro evidence panels. (completed 2026-04-01)
 - [ ] **Phase 9: Hardening, Tests & Release Docs** - Finish smoke tests, diagnostics, and contributor-facing documentation.
 
 ## Phase Details
@@ -155,10 +155,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 08-01: Add thesis-evidence schemas and backend/news provenance surfacing
-- [ ] 08-02: Integrate optional RD-Agent(Q) entrypoint and config switches
-- [ ] 08-03: Create strategy artifact workspace and review flow
-- [ ] 08-04: Expose strategy-factory state in the operator dashboard
+- [x] 08-01: Add thesis-evidence schemas and backend/news provenance surfacing
+- [x] 08-02: Integrate optional RD-Agent(Q) entrypoint and config switches
+- [x] 08-03: Create strategy artifact workspace and review flow
+- [x] 08-04: Expose strategy-factory state in the operator dashboard
 
 ### Phase 9: Hardening, Tests & Release Docs
 **Goal**: Make the project demonstrable, diagnosable, and contributor-ready.
@@ -191,5 +191,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. Risk Guardrails & Live Gating | 4/4 | Complete    | 2026-04-01 |
 | 6. Pro Trading Dashboard Shell | 5/5 | Complete    | 2026-04-01 |
 | 7. Advanced Visual Analytics | 3/3 | Complete    | 2026-04-01 |
-| 8. Strategy Factory & Macro Extensions | 0/4 | Not started | - |
+| 8. Strategy Factory & Macro Extensions | 4/4 | Complete    | 2026-04-01 |
 | 9. Hardening, Tests & Release Docs | 0/4 | Not started | - |

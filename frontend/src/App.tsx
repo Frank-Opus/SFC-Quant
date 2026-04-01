@@ -24,6 +24,8 @@ import { FactorRadar, type RadarAxis } from "./components/dashboard/factor-radar
 import { PositionsHeatmap, type HeatmapCell } from "./components/dashboard/positions-heatmap";
 import { PriceChart, type PriceMarker } from "./components/dashboard/price-chart";
 import { SignalLog } from "./components/dashboard/signal-log";
+import { StrategyFactoryPanel } from "./components/dashboard/strategy-factory-panel";
+import { ThesisEvidencePanel } from "./components/dashboard/thesis-evidence-panel";
 import { Button } from "./components/ui/button";
 import {
   Card,
@@ -98,6 +100,12 @@ function describeEvent(event: EventEnvelope): string {
     case "risk.live_mode.enabled":
     case "risk.live_mode.disabled":
       return String(payload.message ?? "Live mode state updated.");
+    case "strategy.factory.config.updated":
+      return String(payload.reason ?? "Strategy Factory configuration updated.");
+    case "strategy.factory.generated":
+      return `Strategy artifact generated for ${String(payload.symbol ?? "instrument")}.`;
+    case "strategy.factory.failed":
+      return String(payload.reason ?? "Strategy generation failed.");
     default:
       return event.event_type;
   }
@@ -205,6 +213,8 @@ export default function App() {
     snapshot,
     execution,
     risk,
+    strategyStatus,
+    strategyArtifacts,
     latestAnalysis,
     connectionStatus,
     connectionMessage,
@@ -224,6 +234,8 @@ export default function App() {
     engageRiskHaltAction,
     clearRiskHaltAction,
     requestLiveModeAction,
+    toggleStrategyFactoryAction,
+    generateStrategyAction,
   } = useMarketRuntime();
   const [liveConfirmationText, setLiveConfirmationText] = useState("");
 
@@ -319,7 +331,8 @@ export default function App() {
           (event) =>
             event.event_type.startsWith("agent.") ||
             event.event_type.startsWith("execution.") ||
-            event.event_type.startsWith("risk."),
+            event.event_type.startsWith("risk.") ||
+            event.event_type.startsWith("strategy."),
         )
         .slice(0, 8),
     [eventFeed],
@@ -379,6 +392,11 @@ export default function App() {
     ];
   }, [execution.engine_status, latestAnalysis?.outputs, risk.halted, risk.live_mode_enabled, riskScore, selectedMarket?.change_percent]);
 
+  const thesisMacroRole = useMemo(
+    () => latestAnalysis?.outputs.find((role) => role.role === "news_geopolitics") ?? null,
+    [latestAnalysis?.outputs],
+  );
+
   return (
     <main className="app-shell dashboard-shell">
       <motion.section
@@ -389,15 +407,15 @@ export default function App() {
       >
         <div className="hero-copy">
           <div className="hero-topline">
-            <p className="eyebrow">Phase 6 / Pro Trading Dashboard Shell</p>
+            <p className="eyebrow">Phase 8 / Strategy Factory & Macro Extensions</p>
             <Badge color={snapshot.runtime.app_mode === "mock" ? "amber" : "cyan"}>
               {snapshot.runtime.runtime_mode}
             </Badge>
           </div>
           <h1>Operator cockpit for explainable AI execution.</h1>
           <p className="lede">
-            Live metrics, charted price action, risk posture, and runtime controls now sit on the
-            same local-first surface.
+            Live metrics, source-linked thesis evidence, and review-first strategy artifacts now
+            share the same local-first surface.
           </p>
 
           <div className="hero-facts">
@@ -629,6 +647,38 @@ export default function App() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.18 }}
+          >
+            <Card className="panel-card extension-panel">
+              <CardHeader className="panel-headline">
+                <div>
+                  <p className="section-label">Phase 8 Extensions</p>
+                  <CardTitle>Macro evidence + strategy review</CardTitle>
+                  <CardDescription>
+                    Source-linked thesis context and optional review artifacts stay visible before
+                    anything graduates toward runtime strategy adoption.
+                  </CardDescription>
+                </div>
+                <Badge color="cyan">Phase 8</Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="extension-grid">
+                  <ThesisEvidencePanel macroRole={thesisMacroRole} />
+                  <StrategyFactoryPanel
+                    status={strategyStatus}
+                    artifacts={strategyArtifacts}
+                    pendingAction={pendingAction}
+                    onToggle={toggleStrategyFactoryAction}
+                    onGenerate={generateStrategyAction}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.24 }}
           >
             <Card className="panel-card analytics-panel">
               <CardHeader className="panel-headline">

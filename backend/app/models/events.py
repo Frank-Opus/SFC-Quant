@@ -30,6 +30,9 @@ EventType = Literal[
     "risk.halt.cleared",
     "risk.live_mode.enabled",
     "risk.live_mode.disabled",
+    "strategy.factory.config.updated",
+    "strategy.factory.generated",
+    "strategy.factory.failed",
 ]
 
 

@@ -74,6 +74,31 @@ def test_latest_analysis_route_returns_last_run(monkeypatch, tmp_path: Path) -> 
     get_settings.cache_clear()
 
 
+def test_news_role_includes_source_linked_macro_evidence(monkeypatch, tmp_path: Path) -> None:
+    configure_analysis_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    news_role = next(
+        output for output in payload["outputs"] if output["role"] == "news_geopolitics"
+    )
+    assert news_role["sources"]
+    assert any(source["url"] for source in news_role["sources"])
+    assert news_role["macro_thesis"] is not None
+    assert news_role["macro_thesis"]["catalysts"]
+    assert news_role["macro_thesis"]["watch_items"]
+
+    get_settings.cache_clear()
+
+
 def test_provider_factory_selects_openai_compatible_when_configured(monkeypatch, tmp_path: Path) -> None:
     configure_analysis_env(monkeypatch, tmp_path)
     monkeypatch.setenv("AI_PROVIDER", "openai_compatible")

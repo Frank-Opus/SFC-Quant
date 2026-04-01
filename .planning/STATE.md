@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 7 completed with signal-log, heatmap, and factor-radar analytics; Phase 8 ready for planning
-last_updated: "2026-04-01T08:20:00Z"
+stopped_at: Phase 8 completed with source-linked macro evidence and a review-first strategy-factory workspace; Phase 9 ready for planning
+last_updated: "2026-04-01T07:49:03Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 40
-  completed_plans: 28
-  percent: 70
+  completed_plans: 32
+  percent: 80
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
-**Current focus:** Phase 08 — strategy-factory-and-macro-extensions
+**Current focus:** Phase 09 — hardening-tests-release-docs
 
 ## Current Position
 
-Phase: 8
+Phase: 9
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-04-01 — Phase 7 completed with advanced dashboard analytics layered onto the live cockpit
+Last activity: 2026-04-01 — Phase 8 completed with thesis evidence and strategy review surfaces
 
-Progress: [███████░░░] 70%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 28
+- Total plans completed: 32
 - Average duration: -
 - Total execution time: -
 
@@ -51,10 +51,11 @@ Progress: [███████░░░] 70%
 | 5 | 4 | - | - |
 | 6 | 5 | - | - |
 | 7 | 3 | - | - |
+| 8 | 4 | - | - |
 
 **Recent Trend:**
 
-- Last 3 plans: Phase 7 complete
+- Last 3 plans: Phase 8 complete
 - Trend: Advancing
 
 ## Accumulated Context
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [Phase 6]: Compose the dashboard from existing backend status routes and websocket-triggered refreshes
 - [Phase 6]: Use local shadcn-style primitives plus targeted Tremor components in the operator shell
 - [Phase 7]: Compose analytics from the existing dashboard runtime instead of adding new backend endpoints
+- [Phase 8]: Enrich macro/news evidence inside the existing typed analysis contract
+- [Phase 8]: Keep Strategy Factory review-first with configured/effective provider visibility and local artifact persistence
 
 ### Pending Todos
 
@@ -90,10 +93,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 8 still needs a clean seam for macro/news provenance and optional RD-Agent(Q) integration without diluting the core path
+- Phase 9 still needs smoke-test coverage, diagnostics surfaces, and contributor/operator release docs
 
 ## Session Continuity
 
-Last session: 2026-04-01 16:20 CST
-Stopped at: Phase 7 shipped; next recommended action is planning Phase 8
+Last session: 2026-04-01 15:49 CST
+Stopped at: Phase 8 shipped; next recommended action is planning Phase 9
 Resume file: None

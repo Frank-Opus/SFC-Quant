@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     ai_model: str | None = "gpt-5.4"
     ai_timeout_seconds: float = 30.0
 
+    strategy_factory_enabled: bool = False
+    strategy_factory_provider: str = "mock_rdq"
+    strategy_factory_workspace: str = "./var/strategy_factory"
+    strategy_factory_auto_generate: bool = False
+
     exchange_id: str = "binance"
     exchange_api_key: str | None = None
     exchange_api_secret: str | None = None
@@ -67,6 +72,11 @@ class Settings(BaseSettings):
     @field_validator("ai_provider", mode="before")
     @classmethod
     def normalize_ai_provider(cls, value: str) -> str:
+        return str(value).strip().lower()
+
+    @field_validator("strategy_factory_provider", mode="before")
+    @classmethod
+    def normalize_strategy_provider(cls, value: str) -> str:
         return str(value).strip().lower()
 
     @field_validator("execution_mode", "execution_adapter", mode="before")
