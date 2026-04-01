@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates. (completed 2026-04-01)
 - [x] **Phase 7: Advanced Visual Analytics** - Add heatmap, factor radar, richer overlays, and premium signal UX. (completed 2026-04-01)
 - [x] **Phase 8: Strategy Factory & Macro Extensions** - Add optional RD-Agent(Q) workflow and deeper news/macro evidence panels. (completed 2026-04-01)
-- [ ] **Phase 9: Hardening, Tests & Release Docs** - Finish smoke tests, diagnostics, and contributor-facing documentation.
+- [x] **Phase 9: Hardening, Tests & Release Docs** - Finish smoke tests, diagnostics, and contributor-facing documentation. (completed 2026-04-01)
 
 ## Phase Details
 
@@ -172,10 +172,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 09-01: Add smoke-test coverage for core backend/frontend flows
-- [ ] 09-02: Implement health, diagnostics, and structured logging surfaces
-- [ ] 09-03: Write contributor and operator documentation
-- [ ] 09-04: Validate release readiness for an open-source first publish
+- [x] 09-01: Add smoke-test coverage for core backend/frontend flows
+- [x] 09-02: Implement health, diagnostics, and structured logging surfaces
+- [x] 09-03: Write contributor and operator documentation
+- [x] 09-04: Validate release readiness for an open-source first publish
 
 ## Progress
 
@@ -192,4 +192,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 6. Pro Trading Dashboard Shell | 5/5 | Complete    | 2026-04-01 |
 | 7. Advanced Visual Analytics | 3/3 | Complete    | 2026-04-01 |
 | 8. Strategy Factory & Macro Extensions | 4/4 | Complete    | 2026-04-01 |
-| 9. Hardening, Tests & Release Docs | 0/4 | Not started | - |
+| 9. Hardening, Tests & Release Docs | 4/4 | Complete    | 2026-04-01 |

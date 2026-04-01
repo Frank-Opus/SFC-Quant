@@ -5,6 +5,9 @@ from uuid import uuid4
 from app.services.event_store import JsonlEventStore
 from app.services.realtime import WebSocketHub
 from app.models.events import EventEnvelope, EventType
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class EventBus:
@@ -39,6 +42,16 @@ class EventBus:
         )
         self._recent_events.append(event)
         self._event_store.append(event)
+        logger.info(
+            "event_published",
+            extra={
+                "context": {
+                    "event_id": event.event_id,
+                    "event_type": event.event_type,
+                    "source": source,
+                }
+            },
+        )
         await self._websocket_hub.broadcast(event.model_dump(mode="json"))
         return event
 

@@ -1,9 +1,11 @@
+from logging import getLogger
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.analysis import router as analysis_router
+from app.api.routes.diagnostics import router as diagnostics_router
 from app.api.routes.execution import router as execution_router
 from app.api.routes.events import router as events_router
 from app.api.routes.health import router as health_router
@@ -12,6 +14,7 @@ from app.api.routes.risk import router as risk_router
 from app.api.routes.realtime import router as realtime_router
 from app.api.routes.strategy import router as strategy_router
 from app.core.config import get_settings
+from app.core.logging import configure_logging
 from app.core.runtime import resolve_runtime
 from app.services.event_store import JsonlEventStore
 from app.services.analysis import AnalysisService
@@ -23,10 +26,17 @@ from app.services.risk import RiskService
 from app.services.realtime import WebSocketHub
 from app.services.strategy_factory import StrategyFactoryService
 
+logger = getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    configure_logging(settings)
+    logger.info(
+        "app_starting",
+        extra={"context": {"service": "backend", "app_mode": settings.app_mode}},
+    )
     websocket_hub = WebSocketHub()
     event_store = JsonlEventStore(settings.event_log_dir)
     event_bus = EventBus(
@@ -62,6 +72,7 @@ async def lifespan(app: FastAPI):
     execution_service.set_risk_service(risk_service)
 
     app.state.websocket_hub = websocket_hub
+    app.state.settings = settings
     app.state.event_bus = event_bus
     app.state.market_service = market_service
     app.state.analysis_service = analysis_service
@@ -77,6 +88,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        logger.info("app_stopping", extra={"context": {"service": "backend"}})
         await market_service.shutdown()
 
 app = FastAPI(
@@ -95,6 +107,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(diagnostics_router)
 app.include_router(market_router)
 app.include_router(events_router)
 app.include_router(analysis_router)

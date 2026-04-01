@@ -19,8 +19,11 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
 
     get_settings.cache_clear()
 
-    client = TestClient(app)
-    response = client.get("/health")
+    with TestClient(app) as client:
+        response = client.get("/health")
+        live_response = client.get("/health/live")
+        ready_response = client.get("/health/ready")
+        diagnostics_response = client.get("/api/diagnostics/summary")
 
     assert response.status_code == 200
 
@@ -33,5 +36,12 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
     assert payload["app_mode"] == "mock"
     assert payload["execution_mode"] == "paper"
     assert payload["execution_adapter"] == "freqtrade_mock"
+    assert live_response.status_code == 200
+    assert live_response.json()["status"] == "ok"
+    assert ready_response.status_code == 200
+    assert ready_response.json()["service"] == "backend"
+    assert ready_response.json()["checks"]
+    assert diagnostics_response.status_code == 200
+    assert diagnostics_response.json()["runtime"]["runtime_mode"] == "mock-safe"
 
     get_settings.cache_clear()

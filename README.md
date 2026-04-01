@@ -1,22 +1,26 @@
 # dSFC-Quant
 
-Standalone AI/Agent quant trading platform focused on local-first operation, explainable runtime state, and a custom trader-grade frontend.
+Standalone local-first AI/Agent quant trading workstation built around explainability, paper-first safety, and a premium operator dashboard.
 
-## Overview
+## What Ships in v1
 
-`dSFC-Quant` is a single-repo platform with:
+`dSFC-Quant` now includes the full v1 milestone foundation:
 
-- `backend/` — FastAPI control plane for runtime state, future PrimoAgent orchestration, and execution integration
-- `frontend/` — Vite + React shell for the custom trading workstation UI
-- `docker-compose.yml` — one-command local startup for `backend` and `frontend`
+- FastAPI backend control plane with typed runtime, market, analysis, execution, risk, strategy, health, and diagnostics surfaces
+- Vite + React dashboard with live KPI cards, price/P&L charts, signal tape, heatmap, factor radar, thesis evidence, and strategy review panels
+- PrimoAgent-style role outputs for data, technical, news/geopolitics, and risk/decision reasoning
+- Paper-trading execution loop with guarded live-mode enablement
+- Optional review-first Strategy Factory workspace for RD-Agent(Q)-style future extension
+- Replayable JSONL event logging, WebSocket streaming, structured stdout logs, and contributor-ready smoke tests
 
-The repo now includes the Phase 1 local runtime foundation, the Phase 2 market-data/event backbone, the Phase 3 PrimoAgent analysis core, the Phase 4 paper-trading execution loop, and the Phase 5 server-side risk guardrails/live-gating layer. The final pro dashboard still lands in later phases.
+## Repository Layout
 
-## Tech Stack
-
-- Backend: Python, FastAPI, `pydantic-settings`, Uvicorn, ccxt-backed adapter seam
-- Frontend: Vite, React, Tailwind CSS, Framer Motion, Lightweight Charts
-- Runtime: Docker Compose with `backend` and `frontend`
+- `backend/` - FastAPI control plane, runtime services, tests, and local diagnostics
+- `frontend/` - Vite/React operator dashboard
+- `docs/plans/` - phase design documents
+- `docs/runbooks/` - operator and release readiness guides
+- `.planning/` - project roadmap, state, and phase artifacts
+- `docker-compose.yml` - local two-service startup
 
 ## Quick Start
 
@@ -32,80 +36,57 @@ The repo now includes the Phase 1 local runtime foundation, the Phase 2 market-d
    docker compose up --build
    ```
 
-3. Open the services:
+3. Open the main surfaces:
 
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:8000/health`
+- Backend readiness: `http://localhost:8000/health/ready`
+- Diagnostics summary: `http://localhost:8000/api/diagnostics/summary`
 
-## Environment
+## Runtime Defaults
 
-The root `.env.example` is the source of truth for runtime configuration.
-
-Important keys:
+The project stays safe by default:
 
 - `APP_MODE=mock`
+- `EXECUTION_MODE=paper`
 - `LIVE_TRADING_ENABLED=false`
 - `AI_PROVIDER=mock`
-- `AI_BASE_URL=`
-- `AI_MODEL=gpt-5.4`
-- `AI_TIMEOUT_SECONDS=30`
-- `EXCHANGE_ID=binance`
-- `EXECUTION_MODE=paper`
-- `EXECUTION_ADAPTER=freqtrade_mock`
-- `EXECUTION_PAPER_STARTING_BALANCE=10000`
-- `EXECUTION_ORDER_NOTIONAL_USD=500`
-- `RISK_MAX_POSITION_NOTIONAL_USD=1000`
-- `RISK_MAX_CONCURRENT_TRADES=3`
-- `RISK_DAILY_LOSS_LIMIT_USD=250`
-- `RISK_REQUIRE_AGENT_APPROVAL=true`
-- `FRONTEND_API_URL=http://backend:8000`
-- `FRONTEND_WS_URL=ws://backend:8000/ws`
-- `MARKET_SYMBOLS=BTC/USDT,ETH/USDT`
-- `MARKET_TIMEFRAMES=1m,5m`
-- `EVENT_LOG_DIR=./var/events`
+- `STRATEGY_FACTORY_ENABLED=false`
 
-Copy `.env.example` to `.env` and edit values there. Do not commit secrets.
+To use an OpenAI-compatible provider, set `AI_PROVIDER=openai_compatible` plus `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` in `.env`.
 
-## Runtime Modes
+## Key Backend Endpoints
 
-The platform still defaults to `mock-safe` startup:
+### Runtime + diagnostics
 
-- Missing exchange credentials keep the backend in a safe non-live state
-- `LIVE_TRADING_ENABLED=false` keeps live trading disabled by default
-- `AI_PROVIDER=mock` allows startup without third-party AI credentials
-- Set `AI_PROVIDER=openai_compatible` together with `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` to call an OpenAI-compatible vendor
+- `GET /health`
+- `GET /health/live`
+- `GET /health/ready`
+- `GET /api/diagnostics/summary`
+- `GET /api/events/recent`
+- `GET /api/market/snapshot`
+- `GET /ws`
 
-The backend exposes the resolved runtime state through `/health`, serves normalized market state from `/api/market/snapshot`, replayable recent events from `/api/events/recent`, supports on-demand multi-agent analysis through `POST /api/analysis/run`, exposes paper-trading control/status routes under `/api/execution/*`, exposes risk policy/live-gating controls under `/api/risk/*`, returns the last stored analysis through `/api/analysis/latest`, and streams live updates over `/ws`.
+### Analysis + execution
 
-## Current Phase Scope
+- `POST /api/analysis/run`
+- `GET /api/analysis/latest`
+- `POST /api/execution/dispatch`
+- `GET /api/execution/status`
+- `POST /api/execution/control`
 
-Current shipped scope includes:
+### Risk + strategy factory
 
-- backend and frontend workspace scaffolding
-- env-driven backend settings
-- mock-safe runtime resolution
-- typed market snapshot and event contracts
-- JSONL-backed replayable event logging
-- websocket broadcast for backend market state changes
-- typed PrimoAgent role outputs with rationale, confidence, and recommendation metadata
-- swappable AI provider boundary with mock and OpenAI-compatible modes
-- on-demand multi-agent analysis persistence and latest-result retrieval
-- paper-trading execution status, lifecycle events, and operator pause/resume control
-- configurable server-side risk limits, risk-approval enforcement, kill-switch halt, and guarded live-mode enablement
-- frontend live market monitoring shell
-- Dockerfiles and a two-service `docker-compose.yml`
-- backend smoke testing and startup documentation
-
-Still intentionally excluded:
-
-- PrimoAgent role orchestration
-- live trading enablement flows
-- the full trader dashboard and analytics surfaces
-- full dashboard execution/risk UX
+- `GET /api/risk/status`
+- `POST /api/risk/policy`
+- `POST /api/risk/halt`
+- `POST /api/risk/live-mode`
+- `GET /api/strategy/status`
+- `POST /api/strategy/config`
+- `POST /api/strategy/generate`
+- `GET /api/strategy/artifacts`
 
 ## Local Development
-
-If you want to run services without Docker:
 
 ### Backend
 
@@ -113,7 +94,6 @@ If you want to run services without Docker:
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e backend[dev]
-cd backend && pytest -q
 uvicorn app.main:app --app-dir backend --reload
 ```
 
@@ -122,12 +102,48 @@ uvicorn app.main:app --app-dir backend --reload
 ```bash
 cd frontend
 npm install
-npm run build
 npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
+## Testing
+
+### Targeted smoke checks
+
+```bash
+python3 -m pytest -q backend/tests/test_health.py backend/tests/test_smoke_runtime.py
+```
+
+### Full backend suite
+
+```bash
+python3 -m pytest -q backend/tests
+```
+
+### Frontend production build
+
+```bash
+cd frontend && npm run build
+```
+
+### Full release verification
+
+```bash
+python3 -m pytest -q backend/tests && cd frontend && npm run build && cd .. && docker compose config >/dev/null
+```
+
+## Diagnostics and Logs
+
+- Backend emits structured JSON logs to stdout for startup, shutdown, and event publication
+- `/api/diagnostics/summary` returns runtime, websocket, event-count, execution, risk, and strategy state in one payload
+- Event replay is persisted under `EVENT_LOG_DIR` as JSONL for local inspection
+
 ## Safety Notes
 
-- Paper-first and mock-safe operation are the intended defaults
-- Live trading is disabled in Phase 1 and should remain off until later risk-gated phases land
-- Secrets belong in `.env`, never in committed source files
+- Paper trading is the default path; treat live mode as opt-in and heavily gated
+- Strategy Factory writes review artifacts only; it does not auto-adopt strategies into execution
+- Keep all secrets in `.env`; never commit API keys or exchange credentials
+
+## Runbooks
+
+- Operator guide: `docs/runbooks/operator-runbook.md`
+- Release checklist: `docs/runbooks/release-readiness-checklist.md`

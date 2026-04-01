@@ -58,8 +58,8 @@
 ### Operations
 
 - [ ] **OPS-01**: Developer can start the platform with a `docker-compose.yml` that boots `backend` and `frontend`.
-- [ ] **OPS-02**: Developer can run smoke tests covering REST API, WebSocket streaming, and the paper-trade path.
-- [ ] **OPS-03**: Developer can inspect health endpoints and structured logs for the local stack.
+- [x] **OPS-02**: Developer can run smoke tests covering REST API, WebSocket streaming, and the paper-trade path.
+- [x] **OPS-03**: Developer can inspect health endpoints and structured logs for the local stack.
 
 ## v2 Requirements
 
@@ -110,8 +110,8 @@
 | AGENT-05 | Phase 8 | Satisfied |
 | STRAT-01 | Phase 8 | Satisfied |
 | STRAT-02 | Phase 8 | Satisfied |
-| OPS-02 | Phase 9 | Pending |
-| OPS-03 | Phase 9 | Pending |
+| OPS-02 | Phase 9 | Satisfied |
+| OPS-03 | Phase 9 | Satisfied |
 
 **Coverage:**
 - v1 requirements: 29 total
@@ -120,4 +120,4 @@
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 after Phase 8*
+*Last updated: 2026-04-01 after Phase 9*
