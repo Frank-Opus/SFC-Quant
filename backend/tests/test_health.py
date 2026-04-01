@@ -23,10 +23,11 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
     assert response.status_code == 200
 
     payload = response.json()
+    assert payload["name"] == "dSFC-Quant"
+    assert payload["status"] == "ok"
     assert payload["service"] == "backend"
     assert payload["runtime_mode"] == "mock-safe"
     assert payload["live_trading_enabled"] is False
     assert payload["app_mode"] == "mock"
 
     get_settings.cache_clear()
-
