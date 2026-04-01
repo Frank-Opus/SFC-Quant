@@ -37,4 +37,4 @@ score: 4/4 must-haves verified
 
 ## Human Verification Required
 
-- Real external provider check remains optional and local-only because it depends on uncommitted user credentials.
+- Real external provider smoke was attempted against the configured OpenAI-compatible endpoint and reached `/v1/chat/completions`, but the upstream account returned `insufficient_quota`, so fallback-to-mock remained the safe runtime behavior.

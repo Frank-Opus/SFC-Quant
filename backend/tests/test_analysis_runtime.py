@@ -95,7 +95,6 @@ def test_provider_factory_selects_openai_compatible_when_configured(monkeypatch,
 def test_openai_candidate_urls_prefer_v1_path() -> None:
     assert _candidate_urls("https://example.com") == [
         "https://example.com/v1/chat/completions",
-        "https://example.com/chat/completions",
     ]
     assert _candidate_urls("https://example.com/v1") == [
         "https://example.com/v1/chat/completions",

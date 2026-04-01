@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     ai_provider: str = "mock"
     ai_api_key: str | None = None
     ai_base_url: str | None = None
-    ai_model: str | None = None
+    ai_model: str | None = "gpt-5.4"
     ai_timeout_seconds: float = 30.0
 
     exchange_id: str = "binance"

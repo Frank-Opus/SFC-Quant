@@ -214,7 +214,4 @@ def _candidate_urls(base_url: str) -> list[str]:
     base_url = base_url.rstrip("/")
     if base_url.endswith("/v1"):
         return [f"{base_url}/chat/completions"]
-    return [
-        f"{base_url}/v1/chat/completions",
-        f"{base_url}/chat/completions",
-    ]
+    return [f"{base_url}/v1/chat/completions"]

@@ -10,7 +10,7 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_BASE_URL: ${AI_BASE_URL:-}
-      AI_MODEL: ${AI_MODEL:-}
+      AI_MODEL: ${AI_MODEL:-gpt-5.4}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-30}
       EXCHANGE_ID: ${EXCHANGE_ID:-binance}
       EXCHANGE_API_KEY: ${EXCHANGE_API_KEY:-}

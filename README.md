@@ -47,7 +47,7 @@ Important keys:
 - `LIVE_TRADING_ENABLED=false`
 - `AI_PROVIDER=mock`
 - `AI_BASE_URL=`
-- `AI_MODEL=`
+- `AI_MODEL=gpt-5.4`
 - `AI_TIMEOUT_SECONDS=30`
 - `EXCHANGE_ID=binance`
 - `FRONTEND_API_URL=http://backend:8000`
