@@ -34,12 +34,12 @@ Before planning or editing code, read these files in order:
 ## Workflow
 
 - Use GSD planning/execution commands for implementation work when possible
-- Current next step is Phase 1 from `.planning/ROADMAP.md`
-- Preferred continuation command: `$gsd-discuss-phase 1`
-- Direct planning shortcut: `$gsd-plan-phase 1`
+- Current milestone state is archived locally; review `.planning/STATE.md` and `.planning/milestones/v1.0-SUMMARY.md` before resuming
+- Preferred continuation command: `$gsd-new-milestone`
+- Direct planning shortcut: define fresh requirements first, then use `$gsd-plan-phase <phase>`
 
 ## Current Focus
 
-Phase 1: Foundation & Local Runtime
+Milestone archived (`v1.0`)
 
-Goal: deliver a runnable monorepo baseline with backend/frontend shells, env-driven config, and one-command local startup.
+Goal: either define the next milestone or configure a git remote and finish the remote ship workflow.

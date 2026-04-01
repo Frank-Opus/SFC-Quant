@@ -10,6 +10,22 @@ The product is aimed at technical traders and builders who want an explainable, 
 
 Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
 
+## Current State
+
+- Latest archived release: `v1.0`
+- Archive date: 2026-04-01
+- Ship state: locally verified and archived; remote push/PR pending repository remote setup
+- Archive links:
+  - `.planning/milestones/v1.0-SUMMARY.md`
+  - `.planning/milestones/v1.0-ROADMAP.md`
+  - `.planning/milestones/v1.0-REQUIREMENTS.md`
+
+## Next Milestone Goals
+
+- Define the next milestone scope with fresh requirements and roadmap entries
+- Decide whether to add a remote and complete push/PR-based ship workflow
+- Preserve `paper` + `mock-safe` defaults while extending provider, execution, or dashboard capabilities
+
 ## Requirements
 
 ### Validated
