@@ -31,4 +31,5 @@
 
 - [ ] latest phase has an isolated commit
 - [ ] unrelated local/dirty files are not included in the phase commit
-- [ ] milestone artifacts exist under `.planning/phases/`
+- [ ] milestone artifacts exist under `.planning/milestones/` or the active `.planning/phases/` workspace
+- [ ] optional RD-Agent(Q) enablement path documents required Docker access or honest fallback behavior

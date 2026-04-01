@@ -55,6 +55,19 @@ The project stays safe by default:
 
 To use an OpenAI-compatible provider, set `AI_PROVIDER=openai_compatible` plus `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` in `.env`.
 
+To enable the real RD-Agent(Q) path inside the backend container, use the
+optional Compose override that installs the extra and mounts Docker access:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.rdagent.yml up --build
+```
+
+When `STRATEGY_FACTORY_PROVIDER=rd_agent_q`, the backend now attempts to invoke
+`STRATEGY_FACTORY_RD_AGENT_COMMAND` and stores invocation inputs/logs beside the
+review artifact. If the command is unavailable or the container cannot reach a
+Docker daemon, the service falls back to `mock_rdq` and reports that status
+honestly.
+
 ## Key Backend Endpoints
 
 ### Runtime + diagnostics

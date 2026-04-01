@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from app.models.analysis import ActionRecommendation
 
 StrategyProvider = Literal["mock_rdq", "rd_agent_q", "external"]
-ArtifactFileKind = Literal["markdown", "json", "python"]
+ArtifactFileKind = Literal["markdown", "json", "python", "text"]
 
 
 class StrategyArtifactFile(BaseModel):

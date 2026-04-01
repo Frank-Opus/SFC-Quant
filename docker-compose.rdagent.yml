@@ -1,0 +1,11 @@
+services:
+  backend:
+    build:
+      args:
+        BACKEND_EXTRAS: rdagent
+    environment:
+      STRATEGY_FACTORY_ENABLED: ${STRATEGY_FACTORY_ENABLED:-true}
+      STRATEGY_FACTORY_PROVIDER: ${STRATEGY_FACTORY_PROVIDER:-rd_agent_q}
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

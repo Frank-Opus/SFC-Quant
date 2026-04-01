@@ -193,7 +193,7 @@ export type RiskStatusResponse = {
 
 export type StrategyArtifactFile = {
   path: string;
-  kind: "markdown" | "json" | "python";
+  kind: "markdown" | "json" | "python" | "text";
 };
 
 export type StrategyArtifact = {

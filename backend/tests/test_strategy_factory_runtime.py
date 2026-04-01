@@ -1,10 +1,13 @@
 import json
+import threading
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.main import app
+from app.services.strategy_factory import StrategyFactoryService
 
 
 def configure_strategy_env(monkeypatch, tmp_path: Path) -> Path:
@@ -21,6 +24,32 @@ def configure_strategy_env(monkeypatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("STRATEGY_FACTORY_WORKSPACE", str(workspace))
     get_settings.cache_clear()
     return workspace
+
+
+def write_fake_rd_agent(tmp_path: Path, filename: str = "fake_rd_agent.py") -> Path:
+    script_path = tmp_path / filename
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import json",
+                "import os",
+                "from pathlib import Path",
+                "",
+                "artifact_dir = Path(os.environ['DSFC_STRATEGY_ARTIFACT_DIR'])",
+                "input_path = Path(os.environ['DSFC_STRATEGY_INPUT_JSON'])",
+                "payload = json.loads(input_path.read_text())",
+                "generated_path = artifact_dir / 'rdagent-generated.md'",
+                "generated_path.write_text(",
+                "    f\"# RD-Agent Output\\n\\n{payload['symbol']} {payload['timeframe']}\\n\"",
+                ")",
+                "print(f\"generated {generated_path.name}\")",
+                "",
+            ]
+        )
+    )
+    script_path.chmod(0o755)
+    return script_path
 
 
 def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -> None:
@@ -43,6 +72,48 @@ def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -
     assert enable_response.json()["enabled"] is True
     assert enable_response.json()["configured_provider"] == "rd_agent_q"
     assert enable_response.json()["effective_provider"] == "mock_rdq"
+
+    get_settings.cache_clear()
+
+
+def test_strategy_factory_reports_real_rd_agent_when_command_is_available(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = configure_strategy_env(monkeypatch, tmp_path)
+    fake_rd_agent = write_fake_rd_agent(tmp_path)
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "rd_agent_q")
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(fake_rd_agent))
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/api/strategy/status")
+
+    assert response.status_code == 200
+    assert response.json()["workspace"] == str(workspace.resolve())
+    assert response.json()["configured_provider"] == "rd_agent_q"
+    assert response.json()["effective_provider"] == "rd_agent_q"
+
+    get_settings.cache_clear()
+
+
+def test_strategy_factory_falls_back_when_native_rd_agent_lacks_docker_access(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = configure_strategy_env(monkeypatch, tmp_path)
+    fake_rd_agent = write_fake_rd_agent(tmp_path, filename="rdagent")
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "rd_agent_q")
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(fake_rd_agent))
+    monkeypatch.setattr(StrategyFactoryService, "_rd_agent_has_docker_access", lambda self: False)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/api/strategy/status")
+
+    assert response.status_code == 200
+    assert response.json()["workspace"] == str(workspace.resolve())
+    assert response.json()["configured_provider"] == "rd_agent_q"
+    assert response.json()["effective_provider"] == "mock_rdq"
+    assert "Docker daemon access is unavailable" in response.json()["reason"]
 
     get_settings.cache_clear()
 
@@ -85,6 +156,80 @@ def test_strategy_generation_writes_reviewable_artifacts(monkeypatch, tmp_path: 
     assert artifacts_response.status_code == 200
     assert len(artifacts_response.json()) >= 1
     assert artifacts_response.json()[0]["artifact_id"] == artifact["artifact_id"]
+
+    get_settings.cache_clear()
+
+
+def test_strategy_generation_runs_rd_agent_when_configured(monkeypatch, tmp_path: Path) -> None:
+    workspace = configure_strategy_env(monkeypatch, tmp_path)
+    fake_rd_agent = write_fake_rd_agent(tmp_path)
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "rd_agent_q")
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(fake_rd_agent))
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "rd-agent"},
+        )
+        generate_response = client.post(
+            "/api/strategy/generate",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "real rd-agent path"},
+        )
+
+    assert analysis_response.status_code == 200
+    assert generate_response.status_code == 200
+    artifact = generate_response.json()["artifact"]
+    artifact_dir = Path(artifact["directory"])
+    file_names = {Path(item["path"]).name for item in artifact["files"]}
+    assert artifact["effective_provider"] == "rd_agent_q"
+    assert artifact_dir.parent == workspace.resolve()
+    assert {"rdagent.input.json", "rdagent.stdout.log", "rdagent.stderr.log", "rdagent.run.json"} <= file_names
+    assert (artifact_dir / "rdagent.stdout.log").read_text().strip() == "generated rdagent-generated.md"
+    run_meta = json.loads((artifact_dir / "rdagent.run.json").read_text())
+    assert run_meta["status"] == "completed"
+    assert run_meta["returncode"] == 0
+
+    get_settings.cache_clear()
+
+
+def test_strategy_generation_does_not_block_health_route(monkeypatch, tmp_path: Path) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    original_write_artifact = StrategyFactoryService._write_artifact
+
+    def slow_write_artifact(self, *, analysis, notes):
+        time.sleep(1.5)
+        return original_write_artifact(self, analysis=analysis, notes=notes)
+
+    monkeypatch.setattr(StrategyFactoryService, "_write_artifact", slow_write_artifact)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "health concurrency"},
+        )
+
+        result: dict[str, object] = {}
+
+        def run_generate() -> None:
+            result["response"] = client.post(
+                "/api/strategy/generate",
+                json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "health concurrency"},
+            )
+
+        worker = threading.Thread(target=run_generate)
+        worker.start()
+        time.sleep(0.2)
+        started = time.perf_counter()
+        health_response = client.get("/health")
+        elapsed = time.perf_counter() - started
+        worker.join()
+
+    assert analysis_response.status_code == 200
+    assert health_response.status_code == 200
+    assert elapsed < 1.0
+    assert result["response"].status_code == 200
 
     get_settings.cache_clear()
 

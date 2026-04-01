@@ -1,4 +1,9 @@
+import asyncio
 import json
+import os
+import shlex
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -32,6 +37,8 @@ class StrategyFactoryService:
         self._configured_provider = settings.strategy_factory_provider
         self._workspace = Path(settings.strategy_factory_workspace).expanduser().resolve()
         self._auto_generate = settings.strategy_factory_auto_generate
+        self._rd_agent_command = settings.strategy_factory_rd_agent_command.strip()
+        self._rd_agent_timeout_seconds = settings.strategy_factory_rd_agent_timeout_seconds
 
     async def initialize(self) -> None:
         self._workspace.mkdir(parents=True, exist_ok=True)
@@ -109,7 +116,11 @@ class StrategyFactoryService:
             )
 
         try:
-            artifact = self._write_artifact(analysis=analysis, notes=payload.notes)
+            artifact = await asyncio.to_thread(
+                self._write_artifact,
+                analysis=analysis,
+                notes=payload.notes,
+            )
         except Exception as exc:
             await self._event_bus.publish(
                 event_type="strategy.factory.failed",
@@ -142,7 +153,7 @@ class StrategyFactoryService:
         if self._configured_provider == "mock_rdq":
             return "mock_rdq"
         if self._configured_provider == "rd_agent_q":
-            return "mock_rdq"
+            return "rd_agent_q" if self._rd_agent_is_available() else "mock_rdq"
         if self._configured_provider == "external":
             return "mock_rdq"
         return "mock_rdq"
@@ -152,9 +163,16 @@ class StrategyFactoryService:
             return "Strategy Factory is disabled. Enable it to write reviewable strategy artifacts."
         if self._configured_provider == "mock_rdq":
             return "Local deterministic strategy generation is active; full RD-Agent(Q) integration remains optional."
-        if self._configured_provider in {"rd_agent_q", "external"}:
+        if self._configured_provider == "rd_agent_q":
+            unavailable_reason = self._rd_agent_unavailable_reason()
+            if unavailable_reason is None:
+                return (
+                    "RD-Agent(Q) command is available. Strategy generation runs the real command and stores reviewable invocation artifacts."
+                )
+            return unavailable_reason
+        if self._configured_provider == "external":
             return (
-                f"Configured provider '{self._configured_provider}' is not wired yet; local deterministic generation remains active."
+                "Configured provider 'external' is reserved for future adapters; local deterministic generation remains active."
             )
         return (
             f"Configured provider '{self._configured_provider}' is unsupported; local deterministic generation remains active."
@@ -270,4 +288,165 @@ class StrategyFactoryService:
         )
         (artifact_dir / "strategy.py").write_text(strategy_stub)
 
+        if effective_provider == "rd_agent_q":
+            files.extend(
+                self._run_rd_agent(
+                    analysis=analysis,
+                    notes=notes,
+                    artifact_dir=artifact_dir,
+                )
+            )
+            artifact.files = files
+            artifact.summary = f"{summary} RD-Agent(Q) invocation completed successfully."
+            (artifact_dir / "strategy.json").write_text(
+                json.dumps(artifact.model_dump(mode="json"), indent=2)
+            )
+        else:
+            artifact.files = files
+
         return artifact
+
+    def _rd_agent_is_available(self) -> bool:
+        return self._rd_agent_unavailable_reason() is None
+
+    def _rd_agent_unavailable_reason(self) -> str | None:
+        command = self._rd_agent_command_parts()
+        if command is None:
+            return (
+                "Configured provider 'rd_agent_q' is selected, but STRATEGY_FACTORY_RD_AGENT_COMMAND is empty or invalid. "
+                "Set a runnable command or keep the deterministic mock fallback."
+            )
+
+        executable = command[0]
+        resolved_executable = self._resolve_executable(executable)
+        if resolved_executable is None:
+            return (
+                "Configured provider 'rd_agent_q' is selected, but the command is unavailable. "
+                "Install RD-Agent(Q) or set STRATEGY_FACTORY_RD_AGENT_COMMAND; local deterministic generation remains active."
+            )
+
+        if self._command_requires_docker(resolved_executable) and not self._rd_agent_has_docker_access():
+            return (
+                "Configured provider 'rd_agent_q' is selected, but Docker daemon access is unavailable in this runtime. "
+                "Mount /var/run/docker.sock or set DOCKER_HOST for the backend container; local deterministic generation remains active."
+            )
+
+        return None
+
+    def _rd_agent_command_parts(self) -> list[str] | None:
+        if not self._rd_agent_command:
+            return None
+        try:
+            command = shlex.split(self._rd_agent_command)
+        except ValueError:
+            return None
+        return command or None
+
+    def _resolve_executable(self, executable: str) -> str | None:
+        expanded = str(Path(executable).expanduser())
+        if Path(expanded).exists():
+            return expanded if os.access(expanded, os.X_OK) else None
+        return shutil.which(executable)
+
+    def _command_requires_docker(self, executable: str) -> bool:
+        return Path(executable).name == "rdagent"
+
+    def _rd_agent_has_docker_access(self) -> bool:
+        docker_host = os.environ.get("DOCKER_HOST", "").strip()
+        if docker_host:
+            return True
+
+        docker_socket = Path("/var/run/docker.sock")
+        return docker_socket.exists() and os.access(docker_socket, os.R_OK | os.W_OK)
+
+    def _run_rd_agent(
+        self,
+        *,
+        analysis: AnalysisRunResult,
+        notes: str | None,
+        artifact_dir: Path,
+    ) -> list[StrategyArtifactFile]:
+        stdout_path = artifact_dir / "rdagent.stdout.log"
+        stderr_path = artifact_dir / "rdagent.stderr.log"
+        run_meta_path = artifact_dir / "rdagent.run.json"
+        input_path = artifact_dir / "rdagent.input.json"
+
+        input_payload = {
+            "symbol": analysis.symbol,
+            "timeframe": analysis.timeframe,
+            "run_id": analysis.run_id,
+            "recommendation": analysis.overall_recommendation,
+            "notes": notes,
+            "outputs": [output.model_dump(mode="json") for output in analysis.outputs],
+        }
+        input_path.write_text(json.dumps(input_payload, indent=2))
+
+        unavailable_reason = self._rd_agent_unavailable_reason()
+        if unavailable_reason is not None:
+            raise RuntimeError(unavailable_reason)
+
+        command = shlex.split(self._rd_agent_command)
+        env = os.environ.copy()
+        env.update(
+            {
+                "DSFC_STRATEGY_ARTIFACT_DIR": str(artifact_dir),
+                "DSFC_STRATEGY_INPUT_JSON": str(input_path),
+                "DSFC_STRATEGY_SUMMARY_JSON": str(artifact_dir / "strategy.json"),
+                "DSFC_STRATEGY_NOTES": notes or "",
+                "DSFC_ANALYSIS_SYMBOL": analysis.symbol,
+                "DSFC_ANALYSIS_TIMEFRAME": analysis.timeframe,
+                "DSFC_ANALYSIS_RUN_ID": analysis.run_id,
+            }
+        )
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=artifact_dir,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=self._rd_agent_timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            stdout_path.write_text(exc.stdout or "")
+            stderr_path.write_text(exc.stderr or "")
+            run_meta_path.write_text(
+                json.dumps(
+                    {
+                        "command": command,
+                        "timeout_seconds": self._rd_agent_timeout_seconds,
+                        "status": "timeout",
+                    },
+                    indent=2,
+                )
+            )
+            raise RuntimeError(
+                f"RD-Agent(Q) command timed out after {self._rd_agent_timeout_seconds} seconds."
+            ) from exc
+
+        stdout_path.write_text(result.stdout or "")
+        stderr_path.write_text(result.stderr or "")
+        run_meta_path.write_text(
+            json.dumps(
+                {
+                    "command": command,
+                    "returncode": result.returncode,
+                    "status": "completed" if result.returncode == 0 else "failed",
+                },
+                indent=2,
+            )
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"RD-Agent(Q) command failed with exit code {result.returncode}. See {stderr_path} for details."
+            )
+
+        return [
+            StrategyArtifactFile(path=str(input_path), kind="json"),
+            StrategyArtifactFile(path=str(stdout_path), kind="text"),
+            StrategyArtifactFile(path=str(stderr_path), kind="text"),
+            StrategyArtifactFile(path=str(run_meta_path), kind="json"),
+        ]

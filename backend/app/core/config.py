@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     strategy_factory_provider: str = "mock_rdq"
     strategy_factory_workspace: str = "./var/strategy_factory"
     strategy_factory_auto_generate: bool = False
+    strategy_factory_rd_agent_command: str = "rdagent fin_quant"
+    strategy_factory_rd_agent_timeout_seconds: float = 900.0
 
     exchange_id: str = "binance"
     exchange_api_key: str | None = None
