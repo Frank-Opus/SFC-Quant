@@ -19,11 +19,12 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 - [x] Phase 3 validated a typed PrimoAgent core workflow with per-role outputs and a swappable provider seam.
 - [x] Phase 4 validated the paper-trading dispatch loop, execution lifecycle events, and pause/resume controls.
 - [x] Phase 5 validated server-side risk guardrails, approval gating, auto-halt behavior, and guarded live-mode enablement.
+- [x] Phase 6 validated the live dashboard shell with KPI cards, chart surfaces, operator controls, and reconnect-aware realtime UX.
 
 ### Active
 
 - [ ] Build a standalone repo named `dSFC-Quant` with a Python FastAPI backend and Vite/React frontend.
-- [ ] Integrate PrimoAgent as the AI agent brain with clear data, technical, news/geopolitics, and risk/decision roles.
+- [ ] Integrate PrimoAgent as the AI agent brain with clear data, technical-analysis, news/geopolitics, and risk/decision roles.
 - [ ] Use Freqtrade + ccxt for execution, supporting paper trading first and guarded real-order routing second.
 - [ ] Deliver a dark, trader-grade dashboard using Tremor, TradingView Lightweight Charts, shadcn/ui, Tailwind, and Framer Motion.
 - [ ] Support third-party AI providers through environment-based configuration and provider adapters.
@@ -78,6 +79,8 @@ The system must run locally with minimal setup friction. That means a single rep
 | Keep Phase 4 execution spot-style and long-only | Avoids inventing unsupported short/leverage behavior before risk and live-mode phases land | Accepted 2026-04-01 |
 | Centralize mutable guardrails and live-mode state in a dedicated RiskService | Keeps policy enforcement auditable and reusable across execution, UI, and later live-routing flows | Accepted 2026-04-01 |
 | Require explicit confirmation text plus non-mock runtime and credentials before live mode can enable | Makes accidental real-money routing materially harder | Accepted 2026-04-01 |
+| Compose the Phase 6 dashboard from existing backend status routes plus websocket-triggered refreshes | Keeps the control plane explainable and avoids inventing a dashboard-only backend facade | Accepted 2026-04-01 |
+| Add local shadcn-style primitives plus targeted Tremor primitives for the dashboard shell | Turns the mandated frontend stack into real, reusable code without overbuilding the UI system too early | Accepted 2026-04-01 |
 
 ## Evolution
 
@@ -97,4 +100,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 3*
+*Last updated: 2026-04-01 after Phase 6*

@@ -9,10 +9,16 @@
     "preview": "node ./node_modules/vite/bin/vite.js preview"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tremor/react": "^4.0.0-beta-tremor-v4.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "framer-motion": "^12.23.12",
     "lightweight-charts": "^5.0.8",
+    "lucide-react": "^1.7.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.12",

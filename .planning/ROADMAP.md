@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: PrimoAgent Core Graph** - Build the multi-agent analysis and provider abstraction layer. (completed 2026-04-01)
 - [x] **Phase 4: Execution Engine & Paper Trading** - Integrate Freqtrade/ccxt into a realistic dry-run trade loop. (completed 2026-04-01)
 - [x] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls. (completed 2026-04-01)
-- [ ] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates.
+- [x] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates. (completed 2026-04-01)
 - [ ] **Phase 7: Advanced Visual Analytics** - Add heatmap, factor radar, richer overlays, and premium signal UX.
 - [ ] **Phase 8: Strategy Factory & Macro Extensions** - Add optional RD-Agent(Q) workflow and deeper news/macro evidence panels.
 - [ ] **Phase 9: Hardening, Tests & Release Docs** - Finish smoke tests, diagnostics, and contributor-facing documentation.
@@ -121,11 +121,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 06-01: Build the dashboard layout, theme system, and shadcn/Tremor shell
-- [ ] 06-02: Implement glassmorphism operator cards and runtime controls
-- [ ] 06-03: Add Lightweight Charts wrappers for price and P&L series
-- [ ] 06-04: Connect WebSocket state to frontend stores with reconnect UI
-- [ ] 06-05: Polish motion, hierarchy, and responsive behavior for desktop/mobile
+- [x] 06-01: Build the dashboard layout, theme system, and shadcn/Tremor shell
+- [x] 06-02: Implement glassmorphism operator cards and runtime controls
+- [x] 06-03: Add Lightweight Charts wrappers for price and P&L series
+- [x] 06-04: Connect WebSocket state to frontend stores with reconnect UI
+- [x] 06-05: Polish motion, hierarchy, and responsive behavior for desktop/mobile
 
 ### Phase 7: Advanced Visual Analytics
 **Goal**: Add richer market and portfolio visualizations without sacrificing operator clarity.
@@ -189,7 +189,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 3. PrimoAgent Core Graph | 4/4 | Complete    | 2026-04-01 |
 | 4. Execution Engine & Paper Trading | 4/4 | Complete    | 2026-04-01 |
 | 5. Risk Guardrails & Live Gating | 4/4 | Complete    | 2026-04-01 |
-| 6. Pro Trading Dashboard Shell | 0/5 | Not started | - |
+| 6. Pro Trading Dashboard Shell | 5/5 | Complete    | 2026-04-01 |
 | 7. Advanced Visual Analytics | 0/3 | Not started | - |
 | 8. Strategy Factory & Macro Extensions | 0/4 | Not started | - |
 | 9. Hardening, Tests & Release Docs | 0/4 | Not started | - |

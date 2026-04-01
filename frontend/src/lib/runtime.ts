@@ -1,14 +1,33 @@
 export {
+  controlExecution,
+  controlRiskHalt,
+  dispatchExecution,
+  fallbackExecutionStatus,
   fallbackMarketSnapshot,
+  fallbackRiskStatus,
   fallbackRuntimeSnapshot,
+  loadExecutionStatus,
+  loadLatestAnalysis,
   loadMarketSnapshot as loadRuntimeSnapshot,
+  loadRiskStatus,
+  requestLiveMode,
   resolveBackendBaseUrl,
   resolveBackendWsUrl,
+  runAnalysis,
 } from "./market";
 
 export type {
+  AgentAnalysisResult,
+  AnalysisRunResult,
+  Candle,
   EventEnvelope,
+  ExecutionDispatchResult,
+  ExecutionOrder,
+  ExecutionStatusResponse,
   MarketSnapshot,
   MarketSnapshotResponse,
+  PaperPosition,
+  RiskPolicy,
+  RiskStatusResponse,
   RuntimeSnapshot,
 } from "./market";
