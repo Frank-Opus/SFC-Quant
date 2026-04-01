@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Execution Engine & Paper Trading** - Integrate Freqtrade/ccxt into a realistic dry-run trade loop. (completed 2026-04-01)
 - [x] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls. (completed 2026-04-01)
 - [x] **Phase 6: Pro Trading Dashboard Shell** - Deliver the operator dashboard with KPI cards, charts, controls, and live updates. (completed 2026-04-01)
-- [ ] **Phase 7: Advanced Visual Analytics** - Add heatmap, factor radar, richer overlays, and premium signal UX.
+- [x] **Phase 7: Advanced Visual Analytics** - Add heatmap, factor radar, richer overlays, and premium signal UX. (completed 2026-04-01)
 - [ ] **Phase 8: Strategy Factory & Macro Extensions** - Add optional RD-Agent(Q) workflow and deeper news/macro evidence panels.
 - [ ] **Phase 9: Hardening, Tests & Release Docs** - Finish smoke tests, diagnostics, and contributor-facing documentation.
 
@@ -139,9 +139,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Implement animated signal log and timeline affordances
-- [ ] 07-02: Build positions heatmap and factor radar components
-- [ ] 07-03: Integrate advanced analytics into the dashboard without layout regressions
+- [x] 07-01: Implement animated signal log and timeline affordances
+- [x] 07-02: Build positions heatmap and factor radar components
+- [x] 07-03: Integrate advanced analytics into the dashboard without layout regressions
 
 ### Phase 8: Strategy Factory & Macro Extensions
 **Goal**: Extend the platform with optional strategy generation and richer thesis evidence.
@@ -190,6 +190,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. Execution Engine & Paper Trading | 4/4 | Complete    | 2026-04-01 |
 | 5. Risk Guardrails & Live Gating | 4/4 | Complete    | 2026-04-01 |
 | 6. Pro Trading Dashboard Shell | 5/5 | Complete    | 2026-04-01 |
-| 7. Advanced Visual Analytics | 0/3 | Not started | - |
+| 7. Advanced Visual Analytics | 3/3 | Complete    | 2026-04-01 |
 | 8. Strategy Factory & Macro Extensions | 0/4 | Not started | - |
 | 9. Hardening, Tests & Release Docs | 0/4 | Not started | - |

@@ -20,6 +20,7 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 - [x] Phase 4 validated the paper-trading dispatch loop, execution lifecycle events, and pause/resume controls.
 - [x] Phase 5 validated server-side risk guardrails, approval gating, auto-halt behavior, and guarded live-mode enablement.
 - [x] Phase 6 validated the live dashboard shell with KPI cards, chart surfaces, operator controls, and reconnect-aware realtime UX.
+- [x] Phase 7 validated richer dashboard analytics including signal logs, a positions heatmap, and a factor radar.
 
 ### Active
 
@@ -81,6 +82,7 @@ The system must run locally with minimal setup friction. That means a single rep
 | Require explicit confirmation text plus non-mock runtime and credentials before live mode can enable | Makes accidental real-money routing materially harder | Accepted 2026-04-01 |
 | Compose the Phase 6 dashboard from existing backend status routes plus websocket-triggered refreshes | Keeps the control plane explainable and avoids inventing a dashboard-only backend facade | Accepted 2026-04-01 |
 | Add local shadcn-style primitives plus targeted Tremor primitives for the dashboard shell | Turns the mandated frontend stack into real, reusable code without overbuilding the UI system too early | Accepted 2026-04-01 |
+| Build Phase 7 analytics entirely from the existing dashboard runtime state | Delivers richer visuals without inventing a dashboard-only backend analytics surface too early | Accepted 2026-04-01 |
 
 ## Evolution
 
@@ -100,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 6*
+*Last updated: 2026-04-01 after Phase 7*

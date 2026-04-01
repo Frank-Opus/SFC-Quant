@@ -20,7 +20,10 @@ import {
 import { useMemo, useState } from "react";
 
 import { PnlChart } from "./components/dashboard/pnl-chart";
+import { FactorRadar, type RadarAxis } from "./components/dashboard/factor-radar";
+import { PositionsHeatmap, type HeatmapCell } from "./components/dashboard/positions-heatmap";
 import { PriceChart, type PriceMarker } from "./components/dashboard/price-chart";
+import { SignalLog } from "./components/dashboard/signal-log";
 import { Button } from "./components/ui/button";
 import {
   Card,
@@ -49,6 +52,10 @@ function formatCompact(value: number): string {
 
 function formatPercent(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, value));
 }
 
 function describeEvent(event: EventEnvelope): string {
@@ -305,6 +312,73 @@ export default function App() {
         ? "reconnecting"
         : connectionStatus;
 
+  const signalLogEvents = useMemo(
+    () =>
+      eventFeed
+        .filter(
+          (event) =>
+            event.event_type.startsWith("agent.") ||
+            event.event_type.startsWith("execution.") ||
+            event.event_type.startsWith("risk."),
+        )
+        .slice(0, 8),
+    [eventFeed],
+  );
+
+  const heatmapCells = useMemo<HeatmapCell[]>(
+    () =>
+      snapshot.snapshots.map((item) => {
+        const position = execution.positions.find((entry) => entry.symbol === item.symbol);
+        return {
+          key: `${item.symbol}:${item.timeframe}`,
+          label: item.symbol,
+          timeframe: item.timeframe,
+          changePercent: item.change_percent,
+          exposureUsd: position ? position.quantity * position.market_price : item.last_price,
+          pnlUsd: position?.unrealized_pnl ?? 0,
+          active: Boolean(position),
+        };
+      }),
+    [execution.positions, snapshot.snapshots],
+  );
+
+  const factorAxes = useMemo<RadarAxis[]>(() => {
+    const dataRole = latestAnalysis?.outputs.find((role) => role.role === "data");
+    const technicalRole = latestAnalysis?.outputs.find(
+      (role) => role.role === "technical_analysis",
+    );
+    const macroRole = latestAnalysis?.outputs.find(
+      (role) => role.role === "news_geopolitics",
+    );
+    const executionReadiness =
+      (execution.engine_status === "running" ? 62 : 28) +
+      (risk.halted ? -32 : 18) +
+      (risk.live_mode_enabled ? 8 : 0);
+
+    return [
+      {
+        label: "Trend",
+        value: clampScore(Math.abs(selectedMarket?.change_percent ?? 0) * 18 + 28),
+      },
+      {
+        label: "Momentum",
+        value: clampScore((technicalRole?.confidence ?? 0.4) * 100),
+      },
+      {
+        label: "Macro",
+        value: clampScore((macroRole?.confidence ?? 0.38) * 100),
+      },
+      {
+        label: "Execution",
+        value: clampScore(executionReadiness),
+      },
+      {
+        label: "Risk Buffer",
+        value: clampScore(100 - riskScore + (dataRole?.confidence ?? 0.4) * 12),
+      },
+    ];
+  }, [execution.engine_status, latestAnalysis?.outputs, risk.halted, risk.live_mode_enabled, riskScore, selectedMarket?.change_percent]);
+
   return (
     <main className="app-shell dashboard-shell">
       <motion.section
@@ -547,6 +621,41 @@ export default function App() {
                     Run analysis for the selected instrument to populate the multi-agent thesis panel.
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.18 }}
+          >
+            <Card className="panel-card analytics-panel">
+              <CardHeader className="panel-headline">
+                <div>
+                  <p className="section-label">Advanced Visual Analytics</p>
+                  <CardTitle>Signal depth layer</CardTitle>
+                  <CardDescription>
+                    Signal logs, exposure heatmap, and factor radar stay synchronized with the same realtime dashboard state.
+                  </CardDescription>
+                </div>
+                <Badge color="cyan">Phase 7</Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="analytics-grid">
+                  <SignalLog
+                    events={signalLogEvents}
+                    latestAnalysis={latestAnalysis}
+                    describeEvent={describeEvent}
+                  />
+                  <div className="analytics-side-grid">
+                    <PositionsHeatmap cells={heatmapCells} />
+                    <FactorRadar
+                      axes={factorAxes}
+                      recommendation={latestAnalysis?.overall_recommendation ?? "hold"}
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </motion.section>
