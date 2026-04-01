@@ -32,6 +32,13 @@ Last activity: 2026-04-01 — operator runbook acceptance, provider verification
 
 Progress: [██████████] 100%
 
+## Accumulated Context
+
+**Decisions:** See `.planning/PROJECT.md` for the full decision log and current architecture constraints.
+
+**Pending Todos:** 1 pending todo — see `.planning/todos/pending/`
+- `2026-04-01-add-bilingual-ui-and-real-market-integration.md` — add zh/en language switching and opt-in real market integration while preserving safe defaults
+
 ## Blockers/Concerns
 
 - No git remote configured, so push / PR / merge workflow cannot run yet.
