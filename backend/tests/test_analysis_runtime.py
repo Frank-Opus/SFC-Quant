@@ -4,7 +4,14 @@ from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.main import app
-from app.services.providers import OpenAICompatibleProvider, ProviderFactory, _candidate_urls
+from app.services.providers import (
+    OpenAICompatibleProvider,
+    ProviderFactory,
+    _candidate_urls,
+    _extract_json_object,
+    _extract_response_text,
+    _normalize_provider_payload,
+)
 
 
 def configure_analysis_env(monkeypatch, tmp_path: Path) -> None:
@@ -119,10 +126,52 @@ def test_provider_factory_selects_openai_compatible_when_configured(monkeypatch,
 
 def test_openai_candidate_urls_prefer_v1_path() -> None:
     assert _candidate_urls("https://example.com") == [
-        "https://example.com/v1/chat/completions",
+        "https://example.com/v1/responses",
     ]
     assert _candidate_urls("https://example.com/v1") == [
-        "https://example.com/v1/chat/completions",
+        "https://example.com/v1/responses",
+    ]
+
+
+def test_extract_response_text_supports_responses_api_shape() -> None:
+    payload = {
+        "output": [
+            {
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": '{"signal_bias":"neutral","recommendation":"hold","confidence":0.5,"summary":"ok","rationale":["r1"],"evidence":[],"sources":[]}',
+                    }
+                ]
+            }
+        ]
+    }
+
+    assert _extract_response_text(payload).startswith('{"signal_bias":"neutral"')
+
+
+def test_normalize_provider_payload_coerces_common_model_schema_drift() -> None:
+    payload = _extract_json_object(
+        '{"signal_bias":"neutral","recommendation":"Hold / no-trade","confidence":0.31,'
+        '"summary":"thin edge","rationale":["r1"],'
+        '"evidence":{"symbol":"BTC/USDT","market_source":"mock"},'
+        '"sources":["user-provided market snapshot only"]}'
+    )
+
+    normalized = _normalize_provider_payload(payload, role="data")
+
+    assert normalized["recommendation"] == "wait"
+    assert normalized["evidence"] == [
+        {"label": "Symbol", "detail": "BTC/USDT", "kind": "market"},
+        {"label": "Market Source", "detail": "mock", "kind": "market"},
+    ]
+    assert normalized["sources"] == [
+        {
+            "title": "user-provided market snapshot only",
+            "kind": "internal",
+            "url": None,
+            "note": None,
+        }
     ]
 
 

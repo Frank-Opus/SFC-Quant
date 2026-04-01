@@ -74,11 +74,17 @@ class OpenAICompatibleProvider:
     ) -> ProviderAnalysisDraft:
         payload = {
             "model": self.model,
-            "temperature": 0.2,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+            "input": [
+                {
+                    "role": "system",
+                    "content": [{"type": "input_text", "text": system_prompt}],
+                },
+                {
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": user_prompt}],
+                },
             ],
+            "text": {"format": {"type": "text"}},
         }
         last_error: RuntimeError | None = None
         for url in _candidate_urls(self._base_url):
@@ -119,16 +125,14 @@ class OpenAICompatibleProvider:
                 )
                 continue
 
-            choices = response_payload.get("choices") or []
-            if not choices:
+            content = _extract_response_text(response_payload)
+            if not content:
                 last_error = RuntimeError(
-                    f"Provider returned no choices for role {role} from {url}"
+                    f"Provider returned no text output for role {role} from {url}"
                 )
                 continue
 
-            message_content = choices[0].get("message", {}).get("content", "")
-            content = _normalize_message_content(message_content)
-            parsed = _extract_json_object(content)
+            parsed = _normalize_provider_payload(_extract_json_object(content), role=role)
             return ProviderAnalysisDraft.model_validate(parsed)
 
         if last_error is not None:
@@ -190,6 +194,260 @@ def _normalize_message_content(content: object) -> str:
     return str(content)
 
 
+def _extract_response_text(payload: dict) -> str:
+    if isinstance(payload.get("output_text"), str) and payload["output_text"].strip():
+        return str(payload["output_text"]).strip()
+
+    output = payload.get("output")
+    if not isinstance(output, list):
+        return ""
+
+    parts: list[str] = []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if "text" in block and isinstance(block["text"], str):
+                parts.append(block["text"])
+            elif block.get("type") in {"output_text", "text"}:
+                text = block.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+    return "\n".join(part.strip() for part in parts if part and part.strip())
+
+
+def _normalize_provider_payload(payload: dict, *, role: AgentRole) -> dict:
+    default_kind = _default_evidence_kind(role)
+    normalized = dict(payload)
+    normalized["signal_bias"] = _normalize_signal_bias(normalized.get("signal_bias"))
+    normalized["recommendation"] = _normalize_recommendation(
+        normalized.get("recommendation")
+    )
+    normalized["confidence"] = _normalize_confidence(normalized.get("confidence"))
+    normalized["summary"] = str(normalized.get("summary") or "").strip()
+    normalized["rationale"] = _normalize_string_list(normalized.get("rationale"))
+    normalized["evidence"] = _normalize_evidence_points(
+        normalized.get("evidence"), default_kind=default_kind
+    )
+    normalized["sources"] = _normalize_sources(normalized.get("sources"))
+    if "macro_thesis" in normalized and normalized["macro_thesis"] is not None:
+        normalized["macro_thesis"] = _normalize_macro_thesis(normalized["macro_thesis"])
+    return normalized
+
+
+def _normalize_signal_bias(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"bullish", "bearish", "neutral", "cautious"}:
+        return text
+    if any(token in text for token in ("caut", "risk-off", "defens", "uncertain")):
+        return "cautious"
+    if any(token in text for token in ("bull", "positive", "up", "long")):
+        return "bullish"
+    if any(token in text for token in ("bear", "negative", "down", "short")):
+        return "bearish"
+    return "neutral"
+
+
+def _normalize_recommendation(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"buy", "sell", "hold", "reduce", "wait"}:
+        return text
+    compact = text.replace("_", " ").replace("-", " ")
+    if any(token in compact for token in ("reduce", "trim", "de risk", "de-risk")):
+        return "reduce"
+    if any(token in compact for token in ("no trade", "notrade", "stand aside", "wait")):
+        return "wait"
+    if "buy" in compact or "long" in compact:
+        return "buy"
+    if "sell" in compact or "short" in compact:
+        return "sell"
+    if "hold" in compact:
+        return "hold"
+    return "hold"
+
+
+def _normalize_confidence(value: object) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.5
+    return max(0.0, min(1.0, numeric))
+
+
+def _normalize_string_list(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if value is None:
+        return []
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _normalize_evidence_points(value: object, *, default_kind: str) -> list[dict]:
+    if isinstance(value, list):
+        items = value
+    elif isinstance(value, dict):
+        items = [
+            {
+                "label": str(key).replace("_", " ").strip().title(),
+                "detail": _stringify_detail(item_value),
+                "kind": default_kind,
+            }
+            for key, item_value in value.items()
+        ]
+    elif value is None:
+        items = []
+    else:
+        items = [{"label": "Evidence", "detail": str(value).strip(), "kind": default_kind}]
+
+    normalized: list[dict] = []
+    for item in items:
+        if isinstance(item, dict):
+            label = str(item.get("label") or "Evidence").strip()
+            detail = _stringify_detail(item.get("detail"))
+            kind = _normalize_evidence_kind(item.get("kind"), default=default_kind)
+        else:
+            label = "Evidence"
+            detail = str(item).strip()
+            kind = default_kind
+        if not detail:
+            continue
+        normalized.append({"label": label or "Evidence", "detail": detail, "kind": kind})
+    return normalized
+
+
+def _normalize_sources(value: object) -> list[dict]:
+    if isinstance(value, list):
+        items = value
+    elif value is None:
+        items = []
+    else:
+        items = [value]
+
+    normalized: list[dict] = []
+    for item in items:
+        if isinstance(item, dict):
+            title = str(item.get("title") or item.get("name") or "Provider source").strip()
+            kind = _normalize_source_kind(item.get("kind"), title)
+            url = item.get("url")
+            note = item.get("note")
+        else:
+            title = str(item).strip()
+            kind = _normalize_source_kind(None, title)
+            url = None
+            note = None
+        if not title:
+            continue
+        normalized.append(
+            {
+                "title": title,
+                "kind": kind,
+                "url": str(url).strip() if isinstance(url, str) and url.strip() else None,
+                "note": str(note).strip() if isinstance(note, str) and note.strip() else None,
+            }
+        )
+    return normalized
+
+
+def _normalize_macro_thesis(value: object) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    normalized = {
+        "regime": str(value.get("regime") or "unclear").strip(),
+        "stance": _normalize_signal_bias(value.get("stance")),
+        "summary": str(value.get("summary") or "").strip(),
+    }
+    catalysts = value.get("catalysts")
+    if isinstance(catalysts, list):
+        normalized["catalysts"] = [
+            {
+                "label": str(item.get("label") or "Catalyst").strip(),
+                "detail": _stringify_detail(item.get("detail")),
+                "impact": _normalize_signal_bias(item.get("impact")),
+                "horizon": _normalize_macro_horizon(item.get("horizon")),
+            }
+            for item in catalysts
+            if isinstance(item, dict) and _stringify_detail(item.get("detail"))
+        ]
+    else:
+        normalized["catalysts"] = []
+    watch_items = value.get("watch_items")
+    if isinstance(watch_items, list):
+        normalized["watch_items"] = [
+            {
+                "label": str(item.get("label") or "Watch item").strip(),
+                "trigger": _stringify_detail(item.get("trigger")),
+                "implication": _stringify_detail(item.get("implication")),
+            }
+            for item in watch_items
+            if isinstance(item, dict)
+            and _stringify_detail(item.get("trigger"))
+            and _stringify_detail(item.get("implication"))
+        ]
+    else:
+        normalized["watch_items"] = []
+    return normalized
+
+
+def _default_evidence_kind(role: AgentRole) -> str:
+    return {
+        "data": "market",
+        "technical_analysis": "technical",
+        "news_geopolitics": "macro",
+        "risk_decision": "risk",
+    }[role]
+
+
+def _normalize_evidence_kind(value: object, *, default: str) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"market", "technical", "news", "macro", "risk", "internal"}:
+        return text
+    return default
+
+
+def _normalize_source_kind(value: object, title: str) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"exchange", "macro", "news", "internal", "provider"}:
+        return text
+
+    title_lower = title.lower()
+    if any(token in title_lower for token in ("binance", "coinbase", "bybit", "kraken", "exchange")):
+        return "exchange"
+    if any(token in title_lower for token in ("fed", "cpi", "ppi", "macro", "fomc", "treasury")):
+        return "macro"
+    if any(token in title_lower for token in ("reuters", "bloomberg", "news", "headline")):
+        return "news"
+    if any(token in title_lower for token in ("snapshot", "mock", "internal", "user-provided")):
+        return "internal"
+    return "provider"
+
+
+def _normalize_macro_horizon(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"intraday", "swing", "macro"}:
+        return text
+    if "day" in text or "intra" in text:
+        return "intraday"
+    if "swing" in text or "week" in text:
+        return "swing"
+    return "macro"
+
+
+def _stringify_detail(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return json.dumps(value, ensure_ascii=True)
+
+
 def _extract_json_object(text: str) -> dict:
     text = text.strip()
     if text.startswith("```"):
@@ -213,5 +471,5 @@ def _extract_json_object(text: str) -> dict:
 def _candidate_urls(base_url: str) -> list[str]:
     base_url = base_url.rstrip("/")
     if base_url.endswith("/v1"):
-        return [f"{base_url}/chat/completions"]
-    return [f"{base_url}/v1/chat/completions"]
+        return [f"{base_url}/responses"]
+    return [f"{base_url}/v1/responses"]
