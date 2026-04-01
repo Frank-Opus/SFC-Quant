@@ -64,6 +64,9 @@ The system must run locally with minimal setup friction. That means a single rep
 | Build a premium operator dashboard instead of a conventional admin panel | The UI is a differentiator and explicitly called out as a core requirement | — Pending |
 | Keep docker-compose to two primary services (`backend`, `frontend`) for v1 | Minimizes local complexity while still satisfying one-command startup | — Pending |
 | Make RD-Agent(Q) an optional extension point that writes reviewable strategy artifacts | Preserves the requested integration without making v1 depend on research automation | — Pending |
+| Use typed market/event contracts plus append-only JSONL replay storage for the Phase 2 backbone | Keeps runtime telemetry inspectable, local-first, and easy to replay without adding a database too early | Accepted 2026-04-01 |
+| Keep a ccxt-facing adapter boundary but default Phase 2 market reads to deterministic mock generation in safe mode | Satisfies the exchange-adapter requirement without making local startup depend on external market access | Accepted 2026-04-01 |
+| Use an in-process websocket hub for backend event fanout during early phases | Preserves the mandated lightweight local deployment while establishing the realtime seam the dashboard and agents need | Accepted 2026-04-01 |
 
 ## Evolution
 

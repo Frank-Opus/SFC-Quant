@@ -12,8 +12,8 @@ dSFC-Quant moves from a local-first foundation to a fully explainable AI quant w
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation & Local Runtime** - Create the repo runtime, service skeletons, env contracts, and compose startup flow.
-- [ ] **Phase 2: Market Data & Event Backbone** - Normalize market data, define event contracts, and stream backend state.
+- [x] **Phase 1: Foundation & Local Runtime** - Create the repo runtime, service skeletons, env contracts, and compose startup flow. (completed 2026-04-01)
+- [x] **Phase 2: Market Data & Event Backbone** - Normalize market data, define event contracts, and stream backend state. (completed 2026-04-01)
 - [ ] **Phase 3: PrimoAgent Core Graph** - Build the multi-agent analysis and provider abstraction layer.
 - [ ] **Phase 4: Execution Engine & Paper Trading** - Integrate Freqtrade/ccxt into a realistic dry-run trade loop.
 - [ ] **Phase 5: Risk Guardrails & Live Gating** - Add hard risk policies and explicit live-trading controls.
@@ -53,10 +53,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-01: Design shared event schemas and storage contracts
-- [ ] 02-02: Implement market-data ingestion and normalization services
-- [ ] 02-03: Add WebSocket hub and publish/subscribe event routing
-- [ ] 02-04: Validate replay/debug paths and state serialization
+- [x] 02-01: Design shared event schemas and storage contracts
+- [x] 02-02: Implement market-data ingestion and normalization services
+- [x] 02-03: Add WebSocket hub and publish/subscribe event routing
+- [x] 02-04: Validate replay/debug paths and state serialization
 
 ### Phase 3: PrimoAgent Core Graph
 **Goal**: Deliver a typed, explainable PrimoAgent workflow with swappable AI providers.
@@ -184,8 +184,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Local Runtime | 4/4 | Verifying | - |
-| 2. Market Data & Event Backbone | 0/4 | Not started | - |
+| 1. Foundation & Local Runtime | 4/4 | Complete    | 2026-04-01 |
+| 2. Market Data & Event Backbone | 4/4 | Complete    | 2026-04-01 |
 | 3. PrimoAgent Core Graph | 0/4 | Not started | - |
 | 4. Execution Engine & Paper Trading | 0/4 | Not started | - |
 | 5. Risk Guardrails & Live Gating | 0/4 | Not started | - |

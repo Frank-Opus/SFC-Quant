@@ -19,10 +19,25 @@ class Settings(BaseSettings):
 
     frontend_api_url: str = Field(default="http://backend:8000")
     frontend_ws_url: str = Field(default="ws://backend:8000/ws")
+    cors_allowed_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    )
+
+    market_symbols: list[str] = Field(default_factory=lambda: ["BTC/USDT", "ETH/USDT"])
+    market_timeframes: list[str] = Field(default_factory=lambda: ["1m", "5m"])
+    market_history_limit: int = 24
+    market_poll_interval_seconds: float = 3.0
+    market_event_buffer_size: int = 100
+    market_stream_enabled: bool = True
+    event_log_dir: str = "./var/events"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
+        enable_decoding=False,
         extra="ignore",
     )
 
@@ -36,8 +51,21 @@ class Settings(BaseSettings):
     def normalize_ai_provider(cls, value: str) -> str:
         return str(value).strip().lower()
 
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def normalize_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, list):
+            return [item.strip() for item in value if item.strip()]
+        return [item.strip() for item in str(value).split(",") if item.strip()]
+
+    @field_validator("market_symbols", "market_timeframes", mode="before")
+    @classmethod
+    def normalize_csv_lists(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, list):
+            return [item.strip() for item in value if item.strip()]
+        return [item.strip() for item in str(value).split(",") if item.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

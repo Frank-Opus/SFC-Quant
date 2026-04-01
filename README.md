@@ -10,11 +10,11 @@ Standalone AI/Agent quant trading platform focused on local-first operation, exp
 - `frontend/` — Vite + React shell for the custom trading workstation UI
 - `docker-compose.yml` — one-command local startup for `backend` and `frontend`
 
-Phase 1 delivers the local runtime foundation only. It does not yet implement PrimoAgent workflows, exchange execution, or the full pro dashboard.
+The repo now includes the Phase 1 local runtime foundation plus the Phase 2 market-data/event backbone. PrimoAgent workflows, exchange execution, and the final pro dashboard still land in later phases.
 
 ## Tech Stack
 
-- Backend: Python, FastAPI, `pydantic-settings`, Uvicorn
+- Backend: Python, FastAPI, `pydantic-settings`, Uvicorn, ccxt-backed adapter seam
 - Frontend: Vite, React, Tailwind CSS, Framer Motion, Lightweight Charts
 - Runtime: Docker Compose with `backend` and `frontend`
 
@@ -39,7 +39,7 @@ Phase 1 delivers the local runtime foundation only. It does not yet implement Pr
 
 ## Environment
 
-The root `.env.example` is the Phase 1 source of truth for runtime configuration.
+The root `.env.example` is the source of truth for runtime configuration.
 
 Important keys:
 
@@ -49,30 +49,37 @@ Important keys:
 - `EXCHANGE_ID=binance`
 - `FRONTEND_API_URL=http://backend:8000`
 - `FRONTEND_WS_URL=ws://backend:8000/ws`
+- `MARKET_SYMBOLS=BTC/USDT,ETH/USDT`
+- `MARKET_TIMEFRAMES=1m,5m`
+- `EVENT_LOG_DIR=./var/events`
 
 Copy `.env.example` to `.env` and edit values there. Do not commit secrets.
 
 ## Runtime Modes
 
-Phase 1 defaults to `mock-safe` startup:
+The platform still defaults to `mock-safe` startup:
 
 - Missing exchange credentials keep the backend in a safe non-live state
 - `LIVE_TRADING_ENABLED=false` keeps live trading disabled by default
 - `AI_PROVIDER=mock` allows startup without third-party AI credentials
 
-The backend exposes the resolved runtime state through `/health`, and the frontend shell reflects that runtime mode.
+The backend exposes the resolved runtime state through `/health`, serves normalized market state from `/api/market/snapshot`, replayable recent events from `/api/events/recent`, and streams live updates over `/ws`.
 
 ## Current Phase Scope
 
-Phase 1 includes:
+Current shipped scope includes:
 
 - backend and frontend workspace scaffolding
 - env-driven backend settings
 - mock-safe runtime resolution
+- typed market snapshot and event contracts
+- JSONL-backed replayable event logging
+- websocket broadcast for backend market state changes
+- frontend live market monitoring shell
 - Dockerfiles and a two-service `docker-compose.yml`
 - backend smoke testing and startup documentation
 
-Phase 1 intentionally excludes:
+Still intentionally excluded:
 
 - PrimoAgent role orchestration
 - Freqtrade or ccxt execution
