@@ -81,3 +81,13 @@ Optional real-market demo:
 - the default release profile already requests real market data; use `MARKET_DATA_MODE=mock` only when you intentionally want a deterministic local-only demo
 - do not enable live mode without explicit credentials and confirmation text
 - treat strategy artifacts as review material, not auto-trading logic
+
+## 8. Real-market / live-readiness planning
+
+Before attempting true exchange-backed operation, read `docs/runbooks/live-trading-readiness.md`.
+
+Use that runbook to answer three questions first:
+
+1. Which exchange is the target?
+2. Is the next step real market + paper execution, or fully gated live trading?
+3. Are the required credentials and risk limits available?

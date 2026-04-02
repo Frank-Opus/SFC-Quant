@@ -168,4 +168,5 @@ python3 -m pytest -q backend/tests && cd frontend && npm run build && cd .. && d
 ## Runbooks
 
 - Operator guide: `docs/runbooks/operator-runbook.md`
+- Live trading readiness: `docs/runbooks/live-trading-readiness.md`
 - Release checklist: `docs/runbooks/release-readiness-checklist.md`
