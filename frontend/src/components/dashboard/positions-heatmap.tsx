@@ -1,3 +1,5 @@
+import { useLocale } from "../../lib/i18n";
+
 type HeatmapCell = {
   key: string;
   label: string;
@@ -26,15 +28,17 @@ function cellTone(cell: HeatmapCell): string {
 }
 
 export function PositionsHeatmap({ cells }: PositionsHeatmapProps) {
+  const { t, formatCurrency, formatNumber, formatPercent } = useLocale();
+
   return (
     <div className="analytics-card heatmap-card">
       <div className="section-kicker">
-        <span className="section-label">Positions Heatmap</span>
-        <span className="mini-muted">{cells.length} cells</span>
+        <span className="section-label">{t("analytics.heatmap.kicker")}</span>
+        <span className="mini-muted">{t("analytics.heatmap.cells", { count: cells.length })}</span>
       </div>
       <div className="analytics-card-headline">
-        <h3>Exposure field</h3>
-        <p>Active positions glow by live P&L while watchlist cells still show market pressure.</p>
+        <h3>{t("analytics.heatmap.title")}</h3>
+        <p>{t("analytics.heatmap.description")}</p>
       </div>
       <div className="heatmap-grid">
         {cells.map((cell) => (
@@ -49,13 +53,14 @@ export function PositionsHeatmap({ cells }: PositionsHeatmapProps) {
             </div>
             <div className="heatmap-cell-body">
               <span data-positive={cell.changePercent >= 0}>
-                {cell.changePercent >= 0 ? "+" : ""}
-                {cell.changePercent.toFixed(2)}%
+                {formatPercent(cell.changePercent)}
               </span>
               <small>
                 {cell.active
-                  ? `${cell.pnlUsd >= 0 ? "+" : ""}${cell.pnlUsd.toFixed(2)} USD`
-                  : `${cell.exposureUsd.toFixed(0)} USD watch`}
+                  ? formatCurrency(cell.pnlUsd)
+                  : t("analytics.heatmap.watch", {
+                      value: formatNumber(cell.exposureUsd, 0),
+                    })}
               </small>
             </div>
           </article>

@@ -1,6 +1,8 @@
-# dSFC-Quant Backend
+# SFC-Quant Backend
 
-FastAPI control plane for the local-first dSFC-Quant workstation.
+FastAPI control plane for the local-first SFC-Quant workstation.
+
+Repository/runtime identifier: `dSFC-Quant`
 
 ## Responsibilities
 
@@ -19,6 +21,19 @@ python3 -m venv .venv
 python -m pip install -e backend[dev]
 ```
 
+To test the real RD-Agent(Q) strategy path on Linux, install the optional extra:
+
+```bash
+python -m pip install -e backend[dev,rdagent]
+```
+
+The default `rdagent fin_quant` flow also expects Docker daemon access. When you
+run the backend in Compose, prefer the optional override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.rdagent.yml up --build
+```
+
 ## Run the Backend
 
 ```bash
@@ -26,6 +41,12 @@ uvicorn app.main:app --app-dir backend --reload
 ```
 
 Default local URL: `http://localhost:8000`
+
+The default release profile keeps `APP_MODE=mock` and `EXECUTION_MODE=paper`
+while setting `MARKET_DATA_MODE=real`. The backend requests real market reads
+through the existing ccxt seam and reports requested/effective source truthfully.
+If the exchange read fails, the backend degrades honestly and does not substitute
+mock snapshots as if they were live market data.
 
 ## Operations Endpoints
 
@@ -50,7 +71,9 @@ The backend emits JSON logs to stdout. Event publication, startup, and shutdown 
 
 ## Safety Boundaries
 
-- mock-safe mode is the default
+- the default release profile keeps execution paper-first while requesting real market data
 - paper trading is the default execution path
 - live mode requires explicit confirmation and credentials
 - strategy generation produces review artifacts only
+- when `STRATEGY_FACTORY_PROVIDER=rd_agent_q`, the backend runs `STRATEGY_FACTORY_RD_AGENT_COMMAND` and stores invocation logs in the artifact directory
+- if the RD-Agent command or Docker daemon is unavailable, the backend reports the fallback reason and stays on deterministic local artifacts

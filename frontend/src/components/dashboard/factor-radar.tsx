@@ -1,3 +1,5 @@
+import { useLocale } from "../../lib/i18n";
+
 type RadarAxis = {
   label: string;
   value: number;
@@ -17,6 +19,7 @@ function polarPoint(index: number, total: number, radius: number): { x: number; 
 }
 
 export function FactorRadar({ axes, recommendation }: FactorRadarProps) {
+  const { t, formatRecommendation } = useLocale();
   const levels = [28, 48, 68, 88];
   const polygonPoints = axes
     .map((axis, index) => {
@@ -28,12 +31,16 @@ export function FactorRadar({ axes, recommendation }: FactorRadarProps) {
   return (
     <div className="analytics-card radar-card">
       <div className="section-kicker">
-        <span className="section-label">Factor Radar</span>
-        <span className="mini-muted">{recommendation.toUpperCase()}</span>
+        <span className="section-label">{t("analytics.factor.kicker")}</span>
+        <span className="mini-muted">
+          {formatRecommendation(recommendation as "buy" | "sell" | "hold" | "reduce" | "wait", {
+            uppercase: true,
+          })}
+        </span>
       </div>
       <div className="analytics-card-headline">
-        <h3>Signal geometry</h3>
-        <p>Trend, momentum, macro, execution readiness, and remaining risk buffer on one frame.</p>
+        <h3>{t("analytics.factor.title")}</h3>
+        <p>{t("analytics.factor.description")}</p>
       </div>
       <div className="radar-shell">
         <svg className="radar-svg" viewBox="0 0 220 220" role="img">

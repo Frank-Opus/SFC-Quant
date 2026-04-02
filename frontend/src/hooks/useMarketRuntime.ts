@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useLocale } from "../lib/i18n";
 import {
   controlExecution,
   controlRiskHalt,
@@ -119,6 +120,7 @@ function isStrategyEvent(type: string): boolean {
 }
 
 export function useMarketRuntime(): MarketRuntimeState {
+  const { t, formatRecommendation } = useLocale();
   const [snapshot, setSnapshot] = useState<MarketSnapshotResponse>(fallbackMarketSnapshot);
   const [execution, setExecution] = useState<ExecutionStatusResponse>(fallbackExecutionStatus);
   const [risk, setRisk] = useState<RiskStatusResponse>(fallbackRiskStatus);
@@ -127,14 +129,14 @@ export function useMarketRuntime(): MarketRuntimeState {
   const [strategyArtifacts, setStrategyArtifacts] = useState<StrategyArtifact[]>([]);
   const [latestAnalysis, setLatestAnalysis] = useState<AnalysisRunResult | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
-  const [connectionMessage, setConnectionMessage] = useState("Connecting to realtime stream...");
+  const [connectionMessage, setConnectionMessage] = useState(t("runtime.connecting"));
   const [eventFeed, setEventFeed] = useState<EventEnvelope[]>(fallbackMarketSnapshot.recent_events);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [lastEventAt, setLastEventAt] = useState<string | null>(null);
   const [selectedInstrument, setSelectedInstrumentState] =
     useState<InstrumentSelection>(DEFAULT_INSTRUMENT);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState("Operator deck ready.");
+  const [actionMessage, setActionMessage] = useState(t("runtime.ready"));
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -260,8 +262,8 @@ export function useMarketRuntime(): MarketRuntimeState {
     setConnectionStatus(reconnectAttemptsRef.current > 0 ? "reconnecting" : "connecting");
     setConnectionMessage(
       reconnectAttemptsRef.current > 0
-        ? `Realtime link dropped. Retrying (${reconnectAttemptsRef.current})...`
-        : "Connecting to realtime stream...",
+        ? t("runtime.reconnecting", { count: reconnectAttemptsRef.current })
+        : t("runtime.connecting"),
     );
 
     const socket = new WebSocket(resolveBackendWsUrl());
@@ -271,7 +273,7 @@ export function useMarketRuntime(): MarketRuntimeState {
       reconnectAttemptsRef.current = 0;
       setReconnectAttempts(0);
       setConnectionStatus("live");
-      setConnectionMessage("Realtime stream live.");
+      setConnectionMessage(t("runtime.live"));
     });
 
     socket.addEventListener("message", (message) => {
@@ -285,7 +287,7 @@ export function useMarketRuntime(): MarketRuntimeState {
 
       if (event.event_type === "system.connected") {
         setConnectionStatus("live");
-        setConnectionMessage("Realtime stream restored.");
+        setConnectionMessage(t("runtime.restored"));
         return;
       }
 
@@ -337,7 +339,7 @@ export function useMarketRuntime(): MarketRuntimeState {
         return;
       }
       setConnectionStatus("degraded");
-      setConnectionMessage("Realtime stream encountered an error.");
+      setConnectionMessage(t("runtime.error"));
     });
 
     socket.addEventListener("close", () => {
@@ -346,7 +348,7 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
 
       setConnectionStatus("closed");
-      setConnectionMessage("Realtime stream closed.");
+      setConnectionMessage(t("runtime.closed"));
 
       if (!shouldReconnectRef.current) {
         return;
@@ -357,13 +359,11 @@ export function useMarketRuntime(): MarketRuntimeState {
       const delay = Math.min(6000, 800 * reconnectAttemptsRef.current);
       reconnectTimerRef.current = window.setTimeout(() => {
         setConnectionStatus("reconnecting");
-        setConnectionMessage(
-          `Realtime link dropped. Retrying (${reconnectAttemptsRef.current})...`,
-        );
+        setConnectionMessage(t("runtime.reconnecting", { count: reconnectAttemptsRef.current }));
         connect();
       }, delay);
     });
-  }, [refreshExecution, refreshRisk]);
+  }, [refreshExecution, refreshRisk, t]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;
@@ -408,10 +408,16 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
       setLatestAnalysis(result);
       setActionMessage(
-        `Analysis completed for ${result.symbol} ${result.timeframe}: ${result.overall_recommendation}.`,
+        t("runtime.analysisCompleted", {
+          symbol: result.symbol,
+          timeframe: result.timeframe,
+          recommendation: formatRecommendation(result.overall_recommendation, {
+            uppercase: true,
+          }),
+        }),
       );
     });
-  }, [runAction]);
+  }, [formatRecommendation, runAction, t]);
 
   const dispatchAction = useCallback(async () => {
     await runAction("dispatch", async () => {
@@ -436,9 +442,9 @@ export function useMarketRuntime(): MarketRuntimeState {
         return;
       }
       setExecution(result);
-      setActionMessage(result.paused_reason ?? "Execution paused.");
+      setActionMessage(result.paused_reason ?? t("runtime.executionPaused"));
     });
-  }, [runAction]);
+  }, [runAction, t]);
 
   const resumeExecutionAction = useCallback(async () => {
     await runAction("resume", async () => {
@@ -447,9 +453,9 @@ export function useMarketRuntime(): MarketRuntimeState {
         return;
       }
       setExecution(result);
-      setActionMessage("Execution resumed.");
+      setActionMessage(t("runtime.executionResumed"));
     });
-  }, [runAction]);
+  }, [runAction, t]);
 
   const engageRiskHaltAction = useCallback(async () => {
     await runAction("halt", async () => {
@@ -462,9 +468,9 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
       setRisk(result);
       await refreshExecution();
-      setActionMessage(result.halt_reason ?? "Risk halt engaged.");
+      setActionMessage(result.halt_reason ?? t("runtime.haltEngaged"));
     });
-  }, [refreshExecution, runAction]);
+  }, [refreshExecution, runAction, t]);
 
   const clearRiskHaltAction = useCallback(async () => {
     await runAction("clear-halt", async () => {
@@ -473,9 +479,9 @@ export function useMarketRuntime(): MarketRuntimeState {
         return;
       }
       setRisk(result);
-      setActionMessage("Risk halt cleared.");
+      setActionMessage(t("runtime.haltCleared"));
     });
-  }, [runAction]);
+  }, [runAction, t]);
 
   const requestLiveModeAction = useCallback(
     async (enable: boolean, confirmationText?: string) => {
@@ -489,11 +495,12 @@ export function useMarketRuntime(): MarketRuntimeState {
         }
         setRisk(result);
         setActionMessage(
-          result.live_mode_reason ?? (enable ? "Live mode updated." : "Live mode disabled."),
+          result.live_mode_reason ??
+            (enable ? t("runtime.liveModeUpdated") : t("runtime.liveModeDisabled")),
         );
       });
     },
-    [runAction],
+    [runAction, t],
   );
 
   const toggleStrategyFactoryAction = useCallback(
@@ -505,10 +512,10 @@ export function useMarketRuntime(): MarketRuntimeState {
         }
         setStrategyStatus(result);
         await refreshStrategy(selectedInstrumentRef.current);
-        setActionMessage(result.reason ?? "Strategy Factory updated.");
+        setActionMessage(result.reason ?? t("runtime.strategyUpdated"));
       });
     },
-    [refreshStrategy, runAction],
+    [refreshStrategy, runAction, t],
   );
 
   const generateStrategyAction = useCallback(async () => {

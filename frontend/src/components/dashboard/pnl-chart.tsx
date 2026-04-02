@@ -9,6 +9,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 
+import { useLocale } from "../../lib/i18n";
 import type { Candle } from "../../lib/market";
 
 type PnlChartProps = {
@@ -30,6 +31,7 @@ export function PnlChart({
   realizedPnl,
   offsetPnl,
 }: PnlChartProps) {
+  const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
@@ -106,10 +108,10 @@ export function PnlChart({
     <div className="chart-shell pnl-shell">
       <div className="chart-headerline">
         <div>
-          <p className="section-label">P&L Pulse</p>
-          <h3>Derived exposure curve</h3>
+          <p className="section-label">{t("chart.pnl.kicker")}</p>
+          <h3>{t("chart.pnl.title")}</h3>
         </div>
-        <p className="chart-caption">Current open-position P&L projected across the selected candle window.</p>
+        <p className="chart-caption">{t("chart.pnl.caption")}</p>
       </div>
       <div className="chart-canvas chart-canvas-small" ref={containerRef} />
     </div>

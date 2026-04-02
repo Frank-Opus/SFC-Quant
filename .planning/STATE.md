@@ -1,16 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: milestone_complete
-stopped_at: Phase 9 completed with smoke tests, diagnostics, structured logs, and release docs; milestone ready to ship or archive
-last_updated: "2026-04-01T08:01:18Z"
+milestone: v1.2
+milestone_name: sfc-quant-release-hardening
+status: ready_for_archive
+last_updated: "2026-04-01T15:16:43Z"
 last_activity: 2026-04-01
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 36
-  completed_plans: 36
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 12
+  completed_plans: 12
   percent: 100
 ---
 
@@ -18,87 +17,34 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-01)
+See: `.planning/PROJECT.md`, `.planning/REQUIREMENTS.md`, and `.planning/ROADMAP.md`
 
 **Core value:** Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
-**Current focus:** Milestone complete — ready for ship/archive
+**Current focus:** v1.2 completed locally — ready for milestone archive / ship handoff.
 
 ## Current Position
 
-Phase: Complete
-Plan: All phase plans complete
-Status: Milestone complete
-Last activity: 2026-04-01 — Phase 9 completed with diagnostics, smoke tests, and release docs
+Phase: Phase 15 — Release Validation, Browser E2E & Ship Preparation
+Plan: Completed
+Status: All v1.2 phases validated locally; milestone handoff artifacts prepared
+Last activity: 2026-04-01 — backend/frontend/compose/browser validation passed
 
 Progress: [██████████] 100%
 
-## Performance Metrics
-
-**Velocity:**
-
-- Total plans completed: 36
-- Average duration: -
-- Total execution time: -
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1 | 4 | - | - |
-| 2 | 4 | - | - |
-| 3 | 4 | - | - |
-| 4 | 4 | - | - |
-| 5 | 4 | - | - |
-| 6 | 5 | - | - |
-| 7 | 3 | - | - |
-| 8 | 4 | - | - |
-| 9 | 4 | - | - |
-
-**Recent Trend:**
-
-- Last 3 plans: Phase 9 complete
-- Trend: Advancing
-
 ## Accumulated Context
 
-### Decisions
+**Decisions:** See `.planning/PROJECT.md` and `docs/plans/2026-04-01-v1-2-release-design.md`
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+**Pending Todos:** 1 pending todo — see `.planning/todos/pending/`
+- `2026-04-01-add-bilingual-ui-and-real-market-integration.md` — materially satisfied by v1.2; keep only if a future milestone wants to extend beyond the current shipped scope
 
-- [Init]: Single repo with `backend/` and `frontend/`
-- [Init]: FastAPI control plane wraps PrimoAgent + Freqtrade integrations
-- [Init]: Paper trading before guarded live mode
-- [Phase 1]: Add `frontend/.dockerignore` so local artifacts do not override container-installed frontend dependencies during Compose startup
-- [Phase 2]: Use typed market/event models plus JSONL replay storage instead of introducing a database
-- [Phase 2]: Keep a ccxt-facing adapter boundary while defaulting to deterministic mock market generation in safe mode
-- [Phase 2]: Use an in-process websocket hub for backend event fanout to preserve the local-first two-service topology
-- [Phase 3]: Refactor event publication into a shared backend event bus used by both market and agent workflows
-- [Phase 3]: Keep AI provider selection behind an env-driven provider factory with OpenAI-compatible and mock modes
-- [Phase 3]: Preserve explainability with typed per-role outputs and explicit fallback markers
-- [Phase 4]: Add a paper-only execution service and Freqtrade-shaped adapter seam
-- [Phase 4]: Publish execution lifecycle events through the shared replayable event bus
-- [Phase 4]: Expose manual pause/resume execution control through backend APIs
-- [Phase 5]: Centralize guardrails and live-mode state in a dedicated RiskService
-- [Phase 5]: Enforce risk approval before execution when the guard is enabled
-- [Phase 5]: Auto-halt execution on hard-policy or daily-loss breaches
-- [Phase 6]: Compose the dashboard from existing backend status routes and websocket-triggered refreshes
-- [Phase 6]: Use local shadcn-style primitives plus targeted Tremor components in the operator shell
-- [Phase 7]: Compose analytics from the existing dashboard runtime instead of adding new backend endpoints
-- [Phase 8]: Enrich macro/news evidence inside the existing typed analysis contract
-- [Phase 8]: Keep Strategy Factory review-first with configured/effective provider visibility and local artifact persistence
-- [Phase 9]: Add structured stdout logging plus live/ready/diagnostics endpoints instead of heavier observability tooling
+## Blockers/Concerns
 
-### Pending Todos
-
-None yet.
-
-### Blockers/Concerns
-
-- None. Milestone scope is complete.
+- Real market data availability depends on external exchange/network conditions and must be expressed truthfully.
+- Native `infsh` Agentic Browser app was unavailable under the current guest store inventory; equivalent Playwright browser validation passed and the toolchain gap is documented in `docs/reports/2026-04-01-v1-2-release-validation.md`.
 
 ## Session Continuity
 
-Last session: 2026-04-01 16:01 CST
-Stopped at: Milestone completed; next recommended action is ship or archive the milestone
+Last session: 2026-04-02 00:20 CST
+Stopped at: v1.2 milestone validation complete; next recommended action is archive / ship or open the next milestone.
 Resume file: None

@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.core.runtime import RuntimeSnapshot
+from app.core.runtime import MarketDataRuntime, RuntimeSnapshot
 from app.models.execution import ExecutionStatusResponse
 from app.models.risk import RiskStatusResponse
 from app.models.strategy import StrategyFactoryStatusResponse
@@ -28,6 +28,7 @@ class HealthStatusResponse(BaseModel):
 class DiagnosticsSummaryResponse(BaseModel):
     generated_at: datetime
     runtime: RuntimeSnapshot
+    market_data: MarketDataRuntime
     websocket_connections: int
     event_log_path: str
     recent_event_counts: dict[str, int] = Field(default_factory=dict)

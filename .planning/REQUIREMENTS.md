@@ -1,69 +1,39 @@
 # Requirements: dSFC-Quant
 
 **Defined:** 2026-04-01
+**Milestone:** v1.2 — SFC-Quant Release Hardening
 **Core Value:** Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
 
-## v1 Requirements
+## v1.2 Requirements
 
-### Platform
+### Branding
 
-- [ ] **PLAT-01**: Developer can clone `dSFC-Quant` and start backend/frontend with a single documented bootstrap flow.
-- [ ] **PLAT-02**: Developer can configure exchange keys, AI providers, and runtime toggles through `.env` files without editing source code.
-- [ ] **PLAT-03**: Developer can run the full stack in local mock-safe mode when live exchange or AI credentials are absent.
+- [x] **BRAND-01**: User sees `SFC-Quant` as the primary product identity across the dashboard and release-facing documentation.
+- [x] **BRAND-02**: User no longer sees phase/demo-era wording like `Phase 8`, `Extensions`, or hero-level milestone language in the shipped UI.
 
-### Market Data
+### Localization
 
-- [ ] **DATA-01**: User can stream normalized OHLCV/ticker data for selected symbols and timeframes.
-- [ ] **DATA-02**: User can ingest exchange market data through a ccxt-backed adapter layer.
-- [ ] **DATA-03**: User can persist signal, market, and trade events for replay/debugging.
+- [x] **I18N-04**: First visit defaults to Simplified Chinese using a release-specific locale preference key.
+- [x] **I18N-05**: User can still switch between Simplified Chinese and English after first-run.
 
-### Agents
+### Market Runtime
 
-- [ ] **AGENT-01**: User can run a PrimoAgent workflow with dedicated data, technical-analysis, news/geopolitics, and risk/decision roles.
-- [ ] **AGENT-02**: User can inspect each agent’s latest rationale, confidence, and status.
-- [ ] **AGENT-03**: User can trigger an on-demand multi-agent analysis for a selected symbol.
-- [ ] **AGENT-04**: User can connect supported third-party AI providers to the agent workflow through a common backend provider layer.
-- [x] **AGENT-05**: User can inspect source-linked macro/news context that contributed to a trade thesis.
+- [x] **MKT-04**: Default startup requests real market data.
+- [x] **MKT-05**: In real mode, failed exchange reads do not silently substitute mock data as if it were real.
+- [x] **MKT-06**: User can tell requested source, effective source, and current runtime state (`normal`, `fallback`, or `degraded`) from the product UI and backend diagnostics.
 
-### Execution
+### Safety & Clarity
 
-- [ ] **EXEC-01**: User can execute paper trades through the Freqtrade + ccxt path without risking real funds.
-- [ ] **EXEC-02**: User can enable real order routing only after explicit live-mode confirmation and valid credentials.
-- [ ] **EXEC-03**: User can view order lifecycle states and fills in real time.
-- [ ] **EXEC-04**: User can pause or resume the execution engine from the dashboard.
-
-### Risk
-
-- [ ] **RISK-01**: User can configure max position size, max concurrent trades, daily loss limits, and symbol-level blocks.
-- [ ] **RISK-02**: User can require risk-agent approval before any trade is submitted.
-- [ ] **RISK-03**: User can automatically halt trading when configured guardrails are breached.
-
-### Dashboard
-
-- [ ] **DASH-01**: User can view live KPI cards for positions, exposure, P&L, and risk score.
-- [ ] **DASH-02**: User can view price and P&L series on TradingView Lightweight Charts with signal overlays.
-- [ ] **DASH-03**: User can inspect signal logs, a positions heatmap, and a factor radar panel in the same dashboard.
-- [ ] **DASH-04**: User can control agent/runtime state from glassmorphism operator cards with clear start/pause affordances.
-
-### Realtime
-
-- [ ] **WS-01**: User sees backend state changes pushed to the frontend over WebSocket without manual refresh.
-- [ ] **WS-02**: User is notified when the realtime connection drops and when it reconnects.
-
-### Strategy Factory
-
-- [x] **STRAT-01**: User can enable or disable RD-Agent(Q)-based strategy generation as an optional subsystem.
-- [x] **STRAT-02**: Developer can store generated strategy artifacts in a reviewable workspace before runtime use.
+- [x] **SAFE-01**: User can always tell execution remains `paper` even when market data is real.
+- [x] **SAFE-02**: Release docs keep secrets out of frontend and committed source, and do not imply private exchange keys are required for default market reads.
 
 ### Operations
 
-- [ ] **OPS-01**: Developer can start the platform with a `docker-compose.yml` that boots `backend` and `frontend`.
-- [x] **OPS-02**: Developer can run smoke tests covering REST API, WebSocket streaming, and the paper-trade path.
-- [x] **OPS-03**: Developer can inspect health endpoints and structured logs for the local stack.
+- [x] **OPS-06**: Backend tests, frontend production build, and Compose validation pass under the v1.2 release profile.
+- [x] **OPS-07**: Browser-driven release walkthrough validates the shipped interface, or remaining automation gaps are explicitly documented.
+- [x] **OPS-08**: Planning state, runbooks, and release-facing docs match the v1.2 shipped scope.
 
-## v2 Requirements
-
-### Product Expansion
+## Future Requirements
 
 - **PROD-01**: User can manage multiple operator profiles or workspaces.
 - **PROD-02**: User can run richer trade replay/backtest analytics directly from the dashboard.
@@ -74,50 +44,33 @@
 
 | Feature | Reason |
 |---------|--------|
-| High-frequency / sub-second execution | Incompatible with the mandated stack and not aligned with v1 goals |
-| Custodial asset management | Adds major regulatory and security scope beyond a self-hosted trading tool |
-| Copy trading / social feeds | Not part of the standalone operator-platform thesis |
-| Native mobile apps | Web-first scope is more important than channel expansion for v1 |
+| Default live-money trading | Safe paper trading must remain the default path |
+| Private-key-required startup | Default release experience should not force secret configuration |
+| Hiding degraded/fallback state for polish | Truthful runtime surfaces remain a hard requirement |
+| Unlimited visual redesign | This milestone is for release hardening, not open-ended rebranding exploration |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLAT-01 | Phase 1 | Pending |
-| PLAT-02 | Phase 1 | Pending |
-| PLAT-03 | Phase 1 | Pending |
-| OPS-01 | Phase 1 | Pending |
-| DATA-01 | Phase 2 | Pending |
-| DATA-02 | Phase 2 | Pending |
-| DATA-03 | Phase 2 | Pending |
-| WS-01 | Phase 2 | Pending |
-| AGENT-01 | Phase 3 | Satisfied |
-| AGENT-02 | Phase 3 | Satisfied |
-| AGENT-03 | Phase 3 | Satisfied |
-| AGENT-04 | Phase 3 | Satisfied |
-| EXEC-01 | Phase 4 | Satisfied |
-| EXEC-03 | Phase 4 | Satisfied |
-| EXEC-04 | Phase 4 | Satisfied |
-| EXEC-02 | Phase 5 | Satisfied |
-| RISK-01 | Phase 5 | Satisfied |
-| RISK-02 | Phase 5 | Satisfied |
-| RISK-03 | Phase 5 | Satisfied |
-| DASH-01 | Phase 6 | Satisfied |
-| DASH-02 | Phase 6 | Satisfied |
-| DASH-04 | Phase 6 | Satisfied |
-| WS-02 | Phase 6 | Satisfied |
-| DASH-03 | Phase 7 | Satisfied |
-| AGENT-05 | Phase 8 | Satisfied |
-| STRAT-01 | Phase 8 | Satisfied |
-| STRAT-02 | Phase 8 | Satisfied |
-| OPS-02 | Phase 9 | Satisfied |
-| OPS-03 | Phase 9 | Satisfied |
+| BRAND-01 | Phase 13 | Validated |
+| BRAND-02 | Phase 13 | Validated |
+| I18N-04 | Phase 13 | Validated |
+| I18N-05 | Phase 13 | Validated |
+| MKT-04 | Phase 14 | Validated |
+| MKT-05 | Phase 14 | Validated |
+| MKT-06 | Phase 14 | Validated |
+| SAFE-01 | Phase 14 | Validated |
+| SAFE-02 | Phase 15 | Validated |
+| OPS-06 | Phase 15 | Validated |
+| OPS-07 | Phase 15 | Validated |
+| OPS-08 | Phase 15 | Validated |
 
 **Coverage:**
-- v1 requirements: 29 total
-- Mapped to phases: 29
-- Unmapped: 0 ✓
+- v1.2 requirements: 12 total
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 after Phase 9*
+*Last updated: 2026-04-01 after v1.2 validation pass*

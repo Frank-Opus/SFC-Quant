@@ -1,81 +1,83 @@
-import { motion } from "framer-motion";
-import { Activity, AlertTriangle, ShieldAlert, Sparkles, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, Bot, ShieldAlert, TrendingUp, Wrench } from "lucide-react";
 
+import { useLocale } from "../../lib/i18n";
 import type { AnalysisRunResult, EventEnvelope } from "../../lib/market";
 
 type SignalLogProps = {
   events: EventEnvelope[];
   latestAnalysis: AnalysisRunResult | null;
   describeEvent: (event: EventEnvelope) => string;
+  summarizeEvent: (event: EventEnvelope) => {
+    trackLabel: string;
+    outcomeLabel: string;
+    tone: "risk" | "agent" | "execution" | "market" | "system" | "strategy";
+  };
 };
 
-function resolveTone(eventType: string): "risk" | "agent" | "execution" | "market" {
-  if (eventType.startsWith("risk.")) {
-    return "risk";
-  }
-  if (eventType.startsWith("agent.")) {
-    return "agent";
-  }
-  if (eventType.startsWith("execution.")) {
-    return "execution";
-  }
-  return "market";
-}
-
-function EventIcon({ tone }: { tone: "risk" | "agent" | "execution" | "market" }) {
+function EventIcon({ tone }: { tone: "risk" | "agent" | "execution" | "market" | "system" | "strategy" }) {
   if (tone === "risk") {
     return <ShieldAlert size={16} />;
   }
   if (tone === "agent") {
-    return <Sparkles size={16} />;
+    return <Bot size={16} />;
   }
   if (tone === "execution") {
     return <TrendingUp size={16} />;
   }
-  if (tone === "market") {
-    return <Activity size={16} />;
+  if (tone === "strategy") {
+    return <Wrench size={16} />;
   }
-  return <AlertTriangle size={16} />;
+  if (tone === "system") {
+    return <AlertTriangle size={16} />;
+  }
+  return <Activity size={16} />;
 }
 
-export function SignalLog({ events, latestAnalysis, describeEvent }: SignalLogProps) {
+export function SignalLog({ events, latestAnalysis, describeEvent, summarizeEvent }: SignalLogProps) {
+  const { t, formatRecommendation, formatTime } = useLocale();
+
   return (
     <div className="analytics-card signal-log-card">
       <div className="section-kicker">
-        <span className="section-label">Signal Log</span>
-        <span className="mini-muted">{events.length} live entries</span>
+        <span className="section-label">{t("analytics.signalLog.kicker")}</span>
+        <span className="mini-muted">
+          {t("analytics.signalLog.entries", { count: events.length })}
+        </span>
       </div>
       <div className="signal-log-headline">
-        <h3>Decision tape</h3>
+        <h3>{t("analytics.signalLog.title")}</h3>
         <p>
           {latestAnalysis
-            ? `Latest ${latestAnalysis.overall_recommendation.toUpperCase()} thesis on ${latestAnalysis.symbol}.`
-            : "Waiting for the next analysis cycle."}
+            ? t("analytics.signalLog.latest", {
+                recommendation: formatRecommendation(latestAnalysis.overall_recommendation, {
+                  uppercase: true,
+                }),
+                symbol: latestAnalysis.symbol,
+              })
+            : t("analytics.signalLog.waiting")}
         </p>
       </div>
       <div className="signal-log-list">
-        {events.map((event, index) => {
-          const tone = resolveTone(event.event_type);
+        {events.map((event) => {
+          const summary = summarizeEvent(event);
           return (
-            <motion.article
+            <article
               className="signal-item"
-              data-tone={tone}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2, delay: index * 0.03 }}
+              data-tone={summary.tone}
               key={`${event.event_id}-${event.generated_at}`}
             >
               <div className="signal-icon-wrap">
-                <EventIcon tone={tone} />
+                <EventIcon tone={summary.tone} />
               </div>
               <div className="signal-copy">
-                <div className="signal-meta-row">
-                  <strong>{event.event_type}</strong>
-                  <span>{new Date(event.generated_at).toLocaleTimeString()}</span>
+                <div className="signal-meta-row signal-meta-operator">
+                  <span className="signal-track">{summary.trackLabel}</span>
+                  <strong className="signal-outcome">{summary.outcomeLabel}</strong>
+                  <span>{formatTime(event.generated_at)}</span>
                 </div>
                 <p>{describeEvent(event)}</p>
               </div>
-            </motion.article>
+            </article>
           );
         })}
       </div>

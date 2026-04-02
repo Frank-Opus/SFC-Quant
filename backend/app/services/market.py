@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 from app.core.config import Settings
-from app.core.runtime import resolve_runtime
+from app.core.runtime import MarketDataRuntime, resolve_runtime
 from app.models.events import EventEnvelope, MarketSnapshotResponse
 from app.models.market import Candle, MarketSnapshot
 from app.services.event_bus import EventBus
@@ -156,6 +156,7 @@ class MarketRuntimeService:
         self._refresh_lock = asyncio.Lock()
         self._stream_task: asyncio.Task | None = None
         self._shutdown = asyncio.Event()
+        self._last_market_error_detail: str | None = None
 
     @property
     def event_log_path(self) -> str:
@@ -178,15 +179,31 @@ class MarketRuntimeService:
     async def refresh_once(self) -> list[MarketSnapshot]:
         async with self._refresh_lock:
             snapshots: list[MarketSnapshot] = []
+            refresh_error_detail: str | None = None
             for symbol in self._settings.market_symbols:
                 for timeframe in self._settings.market_timeframes:
-                    snapshots.append(
-                        await self.ensure_snapshot(
+                    key = f"{symbol}:{timeframe}"
+                    try:
+                        snapshot = await self.ensure_snapshot(
                             symbol=symbol,
                             timeframe=timeframe,
                             force_refresh=True,
                         )
-                    )
+                        snapshots.append(snapshot)
+                    except RuntimeError as exc:
+                        refresh_error_detail = str(exc)
+                        cached = self._latest.get(key)
+                        if cached and (
+                            self._settings.market_data_mode != "real"
+                            or cached.source == "ccxt"
+                        ):
+                            snapshots.append(cached)
+                        continue
+
+            if self._settings.market_data_mode == "real":
+                self._last_market_error_detail = refresh_error_detail
+            else:
+                self._last_market_error_detail = None
             return snapshots
 
     async def ensure_snapshot(
@@ -200,7 +217,16 @@ class MarketRuntimeService:
         if not force_refresh and key in self._latest:
             return self._latest[key]
 
-        snapshot = await self._fetch_snapshot(symbol=symbol, timeframe=timeframe)
+        try:
+            snapshot = await self._fetch_snapshot(symbol=symbol, timeframe=timeframe)
+        except RuntimeError:
+            cached = self._latest.get(key)
+            if cached and (
+                self._settings.market_data_mode != "real"
+                or cached.source == "ccxt"
+            ):
+                return cached
+            raise
         self._latest[key] = snapshot
         await self._record_event(
             event_type="market.tick",
@@ -208,8 +234,90 @@ class MarketRuntimeService:
         )
         return snapshot
 
+    def market_data_runtime(self) -> MarketDataRuntime:
+        requested_source = "ccxt" if self._settings.market_data_mode == "real" else "mock"
+        mode = self._settings.market_data_mode
+
+        if requested_source == "mock":
+            return MarketDataRuntime(
+                mode=mode,
+                requested_source=requested_source,
+                effective_source="mock",
+                status="mock",
+                fallback_active=False,
+                detail="Mock market data mode active.",
+            )
+
+        if not self._latest:
+            if self._last_market_error_detail:
+                return MarketDataRuntime(
+                    mode=mode,
+                    requested_source=requested_source,
+                    effective_source="unavailable",
+                    status="degraded",
+                    fallback_active=False,
+                    detail=self._last_market_error_detail,
+                )
+            return MarketDataRuntime(
+                mode=mode,
+                requested_source=requested_source,
+                effective_source="unknown",
+                status="pending",
+                fallback_active=False,
+                detail="Real market mode requested; awaiting market runtime refresh.",
+            )
+
+        sources = {snapshot.source for snapshot in self._latest.values()}
+        if sources == {"ccxt"}:
+            if self._last_market_error_detail:
+                return MarketDataRuntime(
+                    mode=mode,
+                    requested_source=requested_source,
+                    effective_source="ccxt",
+                    status="fallback",
+                    fallback_active=True,
+                    detail=self._last_market_error_detail,
+                )
+            return MarketDataRuntime(
+                mode=mode,
+                requested_source=requested_source,
+                effective_source="ccxt",
+                status="live",
+                fallback_active=False,
+                detail="Real market data is active via ccxt.",
+            )
+
+        if "mock" in sources:
+            return MarketDataRuntime(
+                mode=mode,
+                requested_source=requested_source,
+                effective_source="mock",
+                status="degraded",
+                fallback_active=False,
+                detail=(
+                    self._last_market_error_detail
+                    or (
+                        "Real market mode requested but cached snapshots are mock-only; "
+                        "refusing to treat mock data as live market data."
+                    )
+                ),
+            )
+
+        return MarketDataRuntime(
+            mode=mode,
+            requested_source=requested_source,
+            effective_source="unknown",
+            status="degraded",
+            fallback_active=False,
+            detail="Market runtime sources are in an unexpected state.",
+        )
+
+    def status(self) -> MarketDataRuntime:
+        return self.market_data_runtime()
+
     def snapshot_response(self, limit: int = 12) -> MarketSnapshotResponse:
-        runtime = resolve_runtime(self._settings)
+        market_data = self.market_data_runtime()
+        runtime = resolve_runtime(self._settings, market_data=market_data)
         snapshots = list(self._latest.values())
         recent_events = self._event_bus.get_recent_events(limit=limit)
         generated_at = max(
@@ -219,6 +327,7 @@ class MarketRuntimeService:
         return MarketSnapshotResponse(
             generated_at=generated_at,
             runtime=runtime,
+            market_data=market_data,
             snapshots=snapshots,
             recent_events=recent_events,
         )
@@ -234,8 +343,8 @@ class MarketRuntimeService:
                 await self.refresh_once()
 
     async def _fetch_snapshot(self, *, symbol: str, timeframe: str) -> MarketSnapshot:
-        use_mock = self._settings.app_mode == "mock"
-        if not use_mock:
+        use_real_market = self._settings.market_data_mode == "real"
+        if use_real_market:
             try:
                 return await self._exchange_adapter.fetch_market_snapshot(
                     symbol=symbol,
@@ -244,15 +353,23 @@ class MarketRuntimeService:
                     exchange_id=self._settings.exchange_id,
                 )
             except Exception as exc:  # pragma: no cover - depends on external services
+                self._last_market_error_detail = (
+                    f"Exchange adapter unavailable for {symbol} {timeframe}; "
+                    f"real snapshot unavailable (no mock fallback in real mode). detail={exc}"
+                )
                 await self._record_event(
                     event_type="system.warning",
                     payload={
-                        "message": "Exchange adapter unavailable, falling back to mock data.",
+                        "message": "Exchange adapter unavailable in real mode; real snapshot refresh failed.",
                         "detail": str(exc),
                         "symbol": symbol,
                         "timeframe": timeframe,
+                        "market_data_mode": self._settings.market_data_mode,
                     },
                 )
+                raise RuntimeError(self._last_market_error_detail) from exc
+        else:
+            self._last_market_error_detail = None
 
         return await self._mock_adapter.fetch_market_snapshot(
             symbol=symbol,

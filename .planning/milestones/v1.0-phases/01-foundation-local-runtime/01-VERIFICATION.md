@@ -1,15 +1,14 @@
----
 phase: 01-foundation-local-runtime
-verified: 2026-04-01T02:19:33Z
-status: human_needed
-score: 4/5 must-haves verified
+verified: 2026-04-01T03:30:27Z
+status: passed
+score: 5/5 must-haves verified
 ---
 
 # Phase 1: Foundation & Local Runtime Verification Report
 
 **Phase Goal:** Deliver a runnable monorepo baseline with backend/frontend shells, env-driven config, and one-command local startup.
-**Verified:** 2026-04-01T02:19:33Z
-**Status:** human_needed
+**Verified:** 2026-04-01T03:30:27Z
+**Status:** passed
 
 ## Goal Achievement
 
@@ -21,9 +20,9 @@ score: 4/5 must-haves verified
 | 2 | Configuration is controlled through `.env` contracts rather than source edits | ✓ VERIFIED | `.env.example` documents runtime/provider keys and `backend/app/core/config.py` parses them |
 | 3 | Missing secrets keep the backend in a safe non-live mode | ✓ VERIFIED | `backend/tests/test_health.py` passes and asserts `/health` returns `runtime_mode=mock-safe` with `live_trading_enabled=false` |
 | 4 | A two-service Compose topology exists for backend and frontend | ✓ VERIFIED | `docker-compose.yml` defines exactly `backend` and `frontend`, with ports `8000` and `5173` and a backend healthcheck |
-| 5 | The documented `docker compose up --build` path boots both services end to end | ? NEEDS HUMAN | Docker CLI is unavailable in this execution environment, so live Compose startup could not be executed here |
+| 5 | The documented `docker compose up --build` path boots both services end to end | ✓ VERIFIED | `docker compose up --build -d` succeeded on 2026-04-01, `docker compose ps -a` showed `backend` healthy and `frontend` up, `curl http://localhost:8000/health` returned `runtime_mode=\"mock-safe\"`, and `curl http://localhost:5173` returned the Vite HTML shell |
 
-**Score:** 4/5 truths verified
+**Score:** 5/5 truths verified
 
 ### Required Artifacts
 
@@ -33,10 +32,11 @@ score: 4/5 must-haves verified
 | `backend/app/core/config.py` | Env-driven settings loader | ✓ EXISTS + SUBSTANTIVE | Uses `pydantic-settings` for runtime/provider configuration |
 | `backend/app/core/runtime.py` | Mock-safe runtime resolution | ✓ EXISTS + SUBSTANTIVE | Resolves `mock-safe`, `paper-ready`, and warning states |
 | `frontend/src/App.tsx` | Custom React shell | ✓ EXISTS + SUBSTANTIVE | Displays resolved runtime mode and warnings, not a placeholder admin template |
+| `frontend/.dockerignore` | Keep host artifacts out of frontend image builds | ✓ EXISTS + SUBSTANTIVE | Prevents host `node_modules/` and build outputs from overriding container-installed dependencies during `COPY . .` |
 | `docker-compose.yml` | Two-service startup path | ✓ EXISTS + SUBSTANTIVE | Defines `backend` and `frontend` with ports and health plumbing |
 | `README.md` | Bootstrap and safety guide | ✓ EXISTS + SUBSTANTIVE | Documents `cp .env.example .env` and `docker compose up --build` |
 
-**Artifacts:** 6/6 verified
+**Artifacts:** 7/7 verified
 
 ### Key Link Verification
 
@@ -55,11 +55,12 @@ score: 4/5 must-haves verified
 | Requirement | Status | Blocking Issue |
 |-------------|--------|----------------|
 | PLAT-01: clone repo and start backend/frontend with a single documented bootstrap flow | ? NEEDS HUMAN | Docs and artifacts are present, but live `docker compose up --build` still needs a Docker-enabled run |
+| PLAT-01: clone repo and start backend/frontend with a single documented bootstrap flow | ✓ SATISFIED | Verified on 2026-04-01 with live Compose startup and reachable frontend/backend endpoints |
 | PLAT-02: configure exchange keys, AI providers, and runtime toggles through `.env` files | ✓ SATISFIED | Root `.env.example` and backend settings loader are in place |
 | PLAT-03: run the full stack in local mock-safe mode when credentials are absent | ✓ SATISFIED | Backend smoke test verifies `mock-safe` defaults and the frontend surfaces that runtime mode |
-| OPS-01: start the platform with a `docker-compose.yml` that boots `backend` and `frontend` | ? NEEDS HUMAN | Compose topology exists, but real container startup was not executable in this environment |
+| OPS-01: start the platform with a `docker-compose.yml` that boots `backend` and `frontend` | ✓ SATISFIED | Verified on 2026-04-01 after successful backend/frontend container startup |
 
-**Coverage:** 2/4 requirements satisfied automatically, 2/4 need human verification
+**Coverage:** 4/4 requirements satisfied
 
 ## Anti-Patterns Found
 
@@ -67,23 +68,21 @@ None
 
 ## Human Verification Required
 
-### 1. Compose bootstrap on a Docker-enabled machine
-**Test:** From the repo root, run `cp .env.example .env` and then `docker compose up --build`.
-**Expected:** Backend becomes healthy, frontend becomes reachable at `http://localhost:5173`, and `http://localhost:8000/health` returns a payload containing `runtime_mode: "mock-safe"` and `live_trading_enabled: false`.
-**Why human:** Docker is not installed in this execution environment, so end-to-end container startup could not be run programmatically here.
+None.
 
 ## Gaps Summary
 
-No implementation gaps found in the checked codebase. Remaining verification is environmental rather than code-completeness related.
+No remaining implementation or environment-verification gaps were found for Phase 1. During live Compose verification, the frontend container initially failed because host-side frontend artifacts were copied into the image build context; adding `frontend/.dockerignore` resolved the issue and the stack then booted successfully end to end.
 
 ## Verification Metadata
 
 **Verification approach:** Goal-backward (derived from phase goal)  
 **Must-haves source:** PLAN.md frontmatter + Phase 1 goal in ROADMAP.md  
 **Automated checks:** 3 passed (`pytest -q`, `npm run build`, YAML/service structure validation), 0 failed  
-**Human checks required:** 1  
-**Total verification time:** 6 min
+**Human checks required:** 0  
+**Human validation performed:** `docker compose up --build -d`, `docker compose ps -a`, `curl http://localhost:8000/health`, `curl http://localhost:5173`  
+**Total verification time:** 18 min
 
 ---
-*Verified: 2026-04-01T02:19:33Z*
+*Verified: 2026-04-01T03:30:27Z*
 *Verifier: the agent (inline execution)*

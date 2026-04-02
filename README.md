@@ -1,13 +1,15 @@
-# dSFC-Quant
+# SFC-Quant
 
 Standalone local-first AI/Agent quant trading workstation built around explainability, paper-first safety, and a premium operator dashboard.
 
-## What Ships in v1
+Repository/runtime identifier: `dSFC-Quant`
 
-`dSFC-Quant` now includes the full v1 milestone foundation:
+## What Ships in v1.2
+
+`SFC-Quant` now includes the shipped v1 baseline plus the current v1.2 release-hardening additions:
 
 - FastAPI backend control plane with typed runtime, market, analysis, execution, risk, strategy, health, and diagnostics surfaces
-- Vite + React dashboard with live KPI cards, price/P&L charts, signal tape, heatmap, factor radar, thesis evidence, and strategy review panels
+- Vite + React dashboard with zh/en runtime switching, locale-aware formatting, live KPI cards, price/P&L charts, signal tape, heatmap, factor radar, thesis evidence, and strategy review panels
 - PrimoAgent-style role outputs for data, technical, news/geopolitics, and risk/decision reasoning
 - Paper-trading execution loop with guarded live-mode enablement
 - Optional review-first Strategy Factory workspace for RD-Agent(Q)-style future extension
@@ -48,12 +50,32 @@ Standalone local-first AI/Agent quant trading workstation built around explainab
 The project stays safe by default:
 
 - `APP_MODE=mock`
+- `MARKET_DATA_MODE=real`
 - `EXECUTION_MODE=paper`
 - `LIVE_TRADING_ENABLED=false`
 - `AI_PROVIDER=mock`
 - `STRATEGY_FACTORY_ENABLED=false`
 
 To use an OpenAI-compatible provider, set `AI_PROVIDER=openai_compatible` plus `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` in `.env`.
+
+The default release profile requests real market data through the existing ccxt seam while
+keeping execution paper-first. The backend reports requested/effective market source and
+runtime status truthfully through `/health`, `/health/ready`, `/api/diagnostics/summary`,
+and `/api/market/snapshot`. If exchange reads fail, the system degrades honestly instead
+of treating mock data as live market data.
+
+To enable the real RD-Agent(Q) path inside the backend container, use the
+optional Compose override that installs the extra and mounts Docker access:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.rdagent.yml up --build
+```
+
+When `STRATEGY_FACTORY_PROVIDER=rd_agent_q`, the backend now attempts to invoke
+`STRATEGY_FACTORY_RD_AGENT_COMMAND` and stores invocation inputs/logs beside the
+review artifact. If the command is unavailable or the container cannot reach a
+Docker daemon, the service falls back to `mock_rdq` and reports that status
+honestly.
 
 ## Key Backend Endpoints
 
@@ -134,7 +156,7 @@ python3 -m pytest -q backend/tests && cd frontend && npm run build && cd .. && d
 ## Diagnostics and Logs
 
 - Backend emits structured JSON logs to stdout for startup, shutdown, and event publication
-- `/api/diagnostics/summary` returns runtime, websocket, event-count, execution, risk, and strategy state in one payload
+- `/api/diagnostics/summary` returns runtime, market-data truth, websocket, event-count, execution, risk, and strategy state in one payload
 - Event replay is persisted under `EVENT_LOG_DIR` as JSONL for local inspection
 
 ## Safety Notes

@@ -14,12 +14,14 @@ router = APIRouter(prefix="/api/diagnostics", tags=["diagnostics"])
 async def get_diagnostics_summary(request: Request) -> DiagnosticsSummaryResponse:
     settings = getattr(request.app.state, "settings", get_settings())
     event_bus = request.app.state.event_bus
+    market_service = request.app.state.market_service
     websocket_hub = request.app.state.websocket_hub
     execution_service = request.app.state.execution_service
     risk_service = request.app.state.risk_service
     strategy_factory_service = request.app.state.strategy_factory_service
 
-    runtime = resolve_runtime(settings)
+    market_data = market_service.status()
+    runtime = resolve_runtime(settings, market_data=market_data)
     recent_events = event_bus.get_recent_events(limit=50)
     event_counts = Counter(event.event_type for event in recent_events)
     recent_warnings = [
@@ -32,6 +34,7 @@ async def get_diagnostics_summary(request: Request) -> DiagnosticsSummaryRespons
     return DiagnosticsSummaryResponse(
         generated_at=datetime.now(timezone.utc),
         runtime=runtime,
+        market_data=market_data,
         websocket_connections=websocket_hub.connection_count,
         event_log_path=event_bus.event_log_path,
         recent_event_counts=dict(event_counts),
