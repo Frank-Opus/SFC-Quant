@@ -52,6 +52,22 @@ def write_fake_rd_agent(tmp_path: Path, filename: str = "fake_rd_agent.py") -> P
     return script_path
 
 
+def write_sleepy_rd_agent(tmp_path: Path, seconds: float = 1.0) -> Path:
+    script_path = tmp_path / "sleepy_rd_agent.py"
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import time",
+                f"time.sleep({seconds})",
+                "print('done')",
+            ]
+        )
+    )
+    script_path.chmod(0o755)
+    return script_path
+
+
 def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -> None:
     workspace = configure_strategy_env(monkeypatch, tmp_path)
 
@@ -230,6 +246,79 @@ def test_strategy_generation_does_not_block_health_route(monkeypatch, tmp_path: 
     assert health_response.status_code == 200
     assert elapsed < 1.0
     assert result["response"].status_code == 200
+
+    get_settings.cache_clear()
+
+
+def test_strategy_status_exposes_running_generation_state(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    original_write_artifact = StrategyFactoryService._write_artifact
+
+    def slow_write_artifact(self, *, analysis, notes):
+        time.sleep(1.0)
+        return original_write_artifact(self, analysis=analysis, notes=notes)
+
+    monkeypatch.setattr(StrategyFactoryService, "_write_artifact", slow_write_artifact)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "status"},
+        )
+
+        result: dict[str, object] = {}
+
+        def run_generate() -> None:
+            result["response"] = client.post(
+                "/api/strategy/generate",
+                json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "status"},
+            )
+
+        worker = threading.Thread(target=run_generate)
+        worker.start()
+        time.sleep(0.2)
+        status_response = client.get("/api/strategy/status")
+        worker.join()
+
+    assert analysis_response.status_code == 200
+    assert status_response.status_code == 200
+    payload = status_response.json()
+    assert payload["generation"]["status"] == "running"
+    assert payload["generation"]["symbol"] == "BTC/USDT"
+    assert payload["generation"]["detail"]
+    assert result["response"].status_code == 200
+
+    get_settings.cache_clear()
+
+
+def test_strategy_timeout_is_reported_in_status(monkeypatch, tmp_path: Path) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    sleepy_rd_agent = write_sleepy_rd_agent(tmp_path, seconds=0.5)
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "rd_agent_q")
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(sleepy_rd_agent))
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_TIMEOUT_SECONDS", "0.1")
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "timeout"},
+        )
+        generate_response = client.post(
+            "/api/strategy/generate",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "timeout"},
+        )
+        status_response = client.get("/api/strategy/status")
+
+    assert analysis_response.status_code == 200
+    assert generate_response.status_code == 409
+    payload = status_response.json()
+    assert payload["generation"]["status"] == "timeout"
+    assert "timed out" in (payload["generation"]["detail"] or "")
+    assert payload["generation"]["stderr_path"]
 
     get_settings.cache_clear()
 

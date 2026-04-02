@@ -11,8 +11,11 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def healthcheck() -> dict[str, object]:
-    return resolve_runtime(get_settings()).model_dump()
+def healthcheck(request: Request) -> dict[str, object]:
+    settings = getattr(request.app.state, "settings", get_settings())
+    market_service = getattr(request.app.state, "market_service", None)
+    market_data = market_service.status() if market_service else None
+    return resolve_runtime(settings, market_data=market_data).model_dump()
 
 
 @router.get("/health/live")
@@ -26,9 +29,13 @@ def liveness_probe() -> dict[str, str]:
 @router.get("/health/ready", response_model=HealthStatusResponse)
 def readiness_probe(request: Request) -> HealthStatusResponse:
     settings = getattr(request.app.state, "settings", get_settings())
-    runtime = resolve_runtime(settings)
+    market_service = request.app.state.market_service
+    market_data = market_service.status()
+    runtime = resolve_runtime(settings, market_data=market_data)
     event_log_path = Path(request.app.state.event_bus.event_log_path)
     event_log_path.parent.mkdir(parents=True, exist_ok=True)
+    market_snapshot = market_service.snapshot_response()
+    market_check_status = "ok" if market_data.status in {"mock", "live"} else "degraded"
 
     checks = [
         HealthCheck(
@@ -38,14 +45,10 @@ def readiness_probe(request: Request) -> HealthStatusResponse:
         ),
         HealthCheck(
             name="market_snapshots",
-            status=(
-                "ok"
-                if bool(request.app.state.market_service.snapshot_response().snapshots)
-                else "degraded"
-            ),
+            status=market_check_status if market_snapshot.snapshots else "degraded",
             detail=(
-                "Market snapshots loaded."
-                if request.app.state.market_service.snapshot_response().snapshots
+                market_data.detail
+                if market_snapshot.snapshots
                 else "No snapshots loaded yet."
             ),
         ),

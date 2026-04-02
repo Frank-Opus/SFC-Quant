@@ -7,6 +7,7 @@ from app.models.analysis import ActionRecommendation
 
 StrategyProvider = Literal["mock_rdq", "rd_agent_q", "external"]
 ArtifactFileKind = Literal["markdown", "json", "python", "text"]
+StrategyGenerationLifecycle = Literal["idle", "running", "completed", "failed", "timeout"]
 
 
 class StrategyArtifactFile(BaseModel):
@@ -28,6 +29,21 @@ class StrategyArtifact(BaseModel):
     files: list[StrategyArtifactFile] = Field(default_factory=list)
 
 
+class StrategyGenerationState(BaseModel):
+    status: StrategyGenerationLifecycle = "idle"
+    symbol: str | None = None
+    timeframe: str | None = None
+    run_id: str | None = None
+    artifact_directory: str | None = None
+    started_at: datetime | None = None
+    updated_at: datetime | None = None
+    completed_at: datetime | None = None
+    detail: str | None = None
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+    run_meta_path: str | None = None
+
+
 class StrategyFactoryStatusResponse(BaseModel):
     enabled: bool
     configured_provider: str
@@ -37,6 +53,7 @@ class StrategyFactoryStatusResponse(BaseModel):
     reason: str | None = None
     artifact_count: int = 0
     latest_artifact: StrategyArtifact | None = None
+    generation: StrategyGenerationState = Field(default_factory=StrategyGenerationState)
 
 
 class StrategyFactoryConfigRequest(BaseModel):

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     exchange_id: str = "binance"
     exchange_api_key: str | None = None
     exchange_api_secret: str | None = None
+    market_data_mode: str = "mock"
 
     execution_mode: str = "paper"
     execution_adapter: str = "freqtrade_mock"
@@ -48,8 +49,11 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
         ]
     )
+    cors_allowed_origin_regex: str | None = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
     market_symbols: list[str] = Field(default_factory=lambda: ["BTC/USDT", "ETH/USDT"])
     market_timeframes: list[str] = Field(default_factory=lambda: ["1m", "5m"])
@@ -85,6 +89,16 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_execution_fields(cls, value: str) -> str:
         return str(value).strip().lower()
+
+    @field_validator("market_data_mode", mode="before")
+    @classmethod
+    def normalize_market_data_mode(cls, value: str) -> str:
+        normalized = str(value).strip().lower()
+        if normalized in {"real", "live", "ccxt"}:
+            return "real"
+        if normalized in {"mock", "safe", "simulated"}:
+            return "mock"
+        raise ValueError("market_data_mode must be one of: mock, real")
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

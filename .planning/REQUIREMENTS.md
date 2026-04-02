@@ -1,37 +1,37 @@
 # Requirements: dSFC-Quant
 
 **Defined:** 2026-04-01
-**Milestone:** v1.1 — Bilingual UX & Live Market Readiness
+**Milestone:** v1.2 — SFC-Quant Release Hardening
 **Core Value:** Turn multi-agent market intelligence into explainable, risk-bounded trading actions through a standalone platform that a trader can deploy and control locally.
 
-## v1.1 Requirements
+## v1.2 Requirements
+
+### Branding
+
+- [x] **BRAND-01**: User sees `SFC-Quant` as the primary product identity across the dashboard and release-facing documentation.
+- [x] **BRAND-02**: User no longer sees phase/demo-era wording like `Phase 8`, `Extensions`, or hero-level milestone language in the shipped UI.
 
 ### Localization
 
-- [ ] **I18N-01**: User can switch the operator dashboard between Simplified Chinese and English at runtime.
-- [ ] **I18N-02**: User sees the selected language persist across refreshes and reconnects.
-- [ ] **I18N-03**: User sees money, timestamps, numeric labels, and key dashboard copy rendered in the selected locale without reducing readability.
+- [x] **I18N-04**: First visit defaults to Simplified Chinese using a release-specific locale preference key.
+- [x] **I18N-05**: User can still switch between Simplified Chinese and English after first-run.
 
 ### Market Runtime
 
-- [ ] **MKT-01**: Operator can opt into real market data through the ccxt-backed adapter seam while the default startup path remains `mock-safe`.
-- [ ] **MKT-02**: Operator can tell whether current market data is coming from `mock`, `ccxt`, or a fallback/degraded path.
-- [ ] **MKT-03**: Operator sees warnings and diagnostics when real market reads fail and the runtime falls back away from the requested data source.
+- [x] **MKT-04**: Default startup requests real market data.
+- [x] **MKT-05**: In real mode, failed exchange reads do not silently substitute mock data as if it were real.
+- [x] **MKT-06**: User can tell requested source, effective source, and current runtime state (`normal`, `fallback`, or `degraded`) from the product UI and backend diagnostics.
 
-### Dashboard
+### Safety & Clarity
 
-- [ ] **DASH-05**: Operator can see language state and market-source state from the live dashboard without opening dev tools.
-- [ ] **DASH-06**: Bilingual and market-source additions preserve the trader-grade information hierarchy and risk clarity of the existing UI.
-
-### Strategy Factory
-
-- [ ] **STRAT-03**: Operator can inspect truthful RD-Agent strategy-generation progress or failure details during first-run/bootstrap scenarios.
-- [ ] **STRAT-04**: Developer can review RD-Agent runtime artifacts/logs that explain incomplete or timed-out strategy generation.
+- [x] **SAFE-01**: User can always tell execution remains `paper` even when market data is real.
+- [x] **SAFE-02**: Release docs keep secrets out of frontend and committed source, and do not imply private exchange keys are required for default market reads.
 
 ### Operations
 
-- [ ] **OPS-04**: Developer can verify bilingual UX, real-market mode, and fallback/degraded behavior through local tests or smoke checks.
-- [ ] **OPS-05**: Developer can follow updated runbooks/docs to demo the bilingual dashboard, real-market toggle, and RD-Agent status honestly.
+- [x] **OPS-06**: Backend tests, frontend production build, and Compose validation pass under the v1.2 release profile.
+- [x] **OPS-07**: Browser-driven release walkthrough validates the shipped interface, or remaining automation gaps are explicitly documented.
+- [x] **OPS-08**: Planning state, runbooks, and release-facing docs match the v1.2 shipped scope.
 
 ## Future Requirements
 
@@ -44,33 +44,33 @@
 
 | Feature | Reason |
 |---------|--------|
-| Real-money live routing by default | Safe paper trading must remain the default path |
-| Multi-language content generation for agent outputs beyond zh/en UI support | Too broad for this milestone and risks copy/translation drift |
-| Exchange-specific advanced account/state sync | This milestone focuses on market data truthfulness, not full account integration |
-| Fully automated RD-Agent production pipeline | v1.1 only needs honest local operator readiness and diagnostic visibility |
+| Default live-money trading | Safe paper trading must remain the default path |
+| Private-key-required startup | Default release experience should not force secret configuration |
+| Hiding degraded/fallback state for polish | Truthful runtime surfaces remain a hard requirement |
+| Unlimited visual redesign | This milestone is for release hardening, not open-ended rebranding exploration |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| I18N-01 | Phase 10 | Pending |
-| I18N-02 | Phase 10 | Pending |
-| I18N-03 | Phase 10 | Pending |
-| DASH-05 | Phase 10 | Pending |
-| DASH-06 | Phase 10 | Pending |
-| MKT-01 | Phase 11 | Pending |
-| MKT-02 | Phase 11 | Pending |
-| MKT-03 | Phase 11 | Pending |
-| STRAT-03 | Phase 12 | Pending |
-| STRAT-04 | Phase 12 | Pending |
-| OPS-04 | Phase 12 | Pending |
-| OPS-05 | Phase 12 | Pending |
+| BRAND-01 | Phase 13 | Validated |
+| BRAND-02 | Phase 13 | Validated |
+| I18N-04 | Phase 13 | Validated |
+| I18N-05 | Phase 13 | Validated |
+| MKT-04 | Phase 14 | Validated |
+| MKT-05 | Phase 14 | Validated |
+| MKT-06 | Phase 14 | Validated |
+| SAFE-01 | Phase 14 | Validated |
+| SAFE-02 | Phase 15 | Validated |
+| OPS-06 | Phase 15 | Validated |
+| OPS-07 | Phase 15 | Validated |
+| OPS-08 | Phase 15 | Validated |
 
 **Coverage:**
-- v1.1 requirements: 12 total
+- v1.2 requirements: 12 total
 - Mapped to phases: 12
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 for v1.1 milestone kickoff*
+*Last updated: 2026-04-01 after v1.2 validation pass*

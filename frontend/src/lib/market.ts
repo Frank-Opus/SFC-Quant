@@ -1,3 +1,12 @@
+export type MarketDataRuntime = {
+  mode: string;
+  requested_source: string;
+  effective_source: string;
+  status: string;
+  fallback_active: boolean;
+  detail: string | null;
+};
+
 export type RuntimeSnapshot = {
   name: string;
   service: string;
@@ -5,6 +14,7 @@ export type RuntimeSnapshot = {
   app_env: string;
   app_mode: string;
   runtime_mode: string;
+  market_data: MarketDataRuntime;
   ai_provider: string;
   ai_model: string | null;
   exchange_id: string;
@@ -49,6 +59,7 @@ export type EventEnvelope = {
 export type MarketSnapshotResponse = {
   generated_at: string;
   runtime: RuntimeSnapshot;
+  market_data: MarketDataRuntime;
   snapshots: MarketSnapshot[];
   recent_events: EventEnvelope[];
 };
@@ -210,6 +221,21 @@ export type StrategyArtifact = {
   files: StrategyArtifactFile[];
 };
 
+export type StrategyGenerationState = {
+  status: "idle" | "running" | "completed" | "failed" | "timeout";
+  symbol: string | null;
+  timeframe: string | null;
+  run_id: string | null;
+  artifact_directory: string | null;
+  started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  detail: string | null;
+  stdout_path: string | null;
+  stderr_path: string | null;
+  run_meta_path: string | null;
+};
+
 export type StrategyFactoryStatusResponse = {
   enabled: boolean;
   configured_provider: string;
@@ -219,6 +245,7 @@ export type StrategyFactoryStatusResponse = {
   reason: string | null;
   artifact_count: number;
   latest_artifact: StrategyArtifact | null;
+  generation: StrategyGenerationState;
 };
 
 export type StrategyGenerationResponse = {
@@ -228,12 +255,20 @@ export type StrategyGenerationResponse = {
 };
 
 export const fallbackRuntimeSnapshot: RuntimeSnapshot = {
-  name: "dSFC-Quant",
+  name: "SFC-Quant",
   service: "backend",
   status: "degraded",
   app_env: "development",
   app_mode: "mock",
-  runtime_mode: "mock-safe",
+  runtime_mode: "paper",
+  market_data: {
+    mode: "mock",
+    requested_source: "mock",
+    effective_source: "mock",
+    status: "fallback",
+    fallback_active: true,
+    detail: "Backend unavailable. Frontend fallback metadata is active.",
+  },
   ai_provider: "mock",
   ai_model: "gpt-5.4",
   exchange_id: "binance",
@@ -249,6 +284,7 @@ export const fallbackRuntimeSnapshot: RuntimeSnapshot = {
 export const fallbackMarketSnapshot: MarketSnapshotResponse = {
   generated_at: new Date().toISOString(),
   runtime: fallbackRuntimeSnapshot,
+  market_data: fallbackRuntimeSnapshot.market_data,
   snapshots: [],
   recent_events: [
     {
@@ -301,7 +337,55 @@ export const fallbackStrategyStatus: StrategyFactoryStatusResponse = {
   reason: "Strategy Factory runtime unavailable.",
   artifact_count: 0,
   latest_artifact: null,
+  generation: {
+    status: "idle",
+    symbol: null,
+    timeframe: null,
+    run_id: null,
+    artifact_directory: null,
+    started_at: null,
+    updated_at: null,
+    completed_at: null,
+    detail: null,
+    stdout_path: null,
+    stderr_path: null,
+    run_meta_path: null,
+  },
 };
+
+function normalizeMarketSnapshotResponse(
+  payload: Partial<MarketSnapshotResponse> | null | undefined,
+): MarketSnapshotResponse {
+  const runtime = {
+    ...fallbackRuntimeSnapshot,
+    ...(payload?.runtime ?? {}),
+  };
+  const marketData = payload?.market_data ?? runtime.market_data ?? fallbackRuntimeSnapshot.market_data;
+
+  return {
+    generated_at: payload?.generated_at ?? new Date().toISOString(),
+    runtime: {
+      ...runtime,
+      market_data: marketData,
+    },
+    market_data: marketData,
+    snapshots: Array.isArray(payload?.snapshots) ? payload!.snapshots : [],
+    recent_events: Array.isArray(payload?.recent_events) ? payload!.recent_events : [],
+  };
+}
+
+function normalizeStrategyStatusResponse(
+  payload: Partial<StrategyFactoryStatusResponse> | null | undefined,
+): StrategyFactoryStatusResponse {
+  return {
+    ...fallbackStrategyStatus,
+    ...(payload ?? {}),
+    generation: {
+      ...fallbackStrategyStatus.generation,
+      ...(payload?.generation ?? {}),
+    },
+  };
+}
 
 function readEnvValue(key: "VITE_API_BASE_URL" | "VITE_WS_URL"): string | undefined {
   const value = import.meta.env[key];
@@ -322,8 +406,7 @@ export function resolveBackendBaseUrl(): string {
     return "http://localhost:8000";
   }
 
-  const host = window.location.hostname || "localhost";
-  return `http://${host}:8000`;
+  return "";
 }
 
 export function resolveBackendWsUrl(): string {
@@ -337,8 +420,7 @@ export function resolveBackendWsUrl(): string {
   }
 
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const host = window.location.hostname || "localhost";
-  return `${protocol}://${host}:8000/ws`;
+  return `${protocol}://${window.location.host}/ws`;
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -368,7 +450,8 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function loadMarketSnapshot(): Promise<MarketSnapshotResponse> {
   try {
-    return await requestJson<MarketSnapshotResponse>("/api/market/snapshot");
+    const payload = await requestJson<MarketSnapshotResponse>("/api/market/snapshot");
+    return normalizeMarketSnapshotResponse(payload);
   } catch {
     return fallbackMarketSnapshot;
   }
@@ -392,7 +475,8 @@ export async function loadRiskStatus(): Promise<RiskStatusResponse> {
 
 export async function loadStrategyStatus(): Promise<StrategyFactoryStatusResponse> {
   try {
-    return await requestJson<StrategyFactoryStatusResponse>("/api/strategy/status");
+    const payload = await requestJson<StrategyFactoryStatusResponse>("/api/strategy/status");
+    return normalizeStrategyStatusResponse(payload);
   } catch {
     return fallbackStrategyStatus;
   }

@@ -1,6 +1,7 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
 import { Globe2, Newspaper, Radar, ShieldAlert } from "lucide-react";
 
+import { useLocale } from "../../lib/i18n";
 import type { AgentAnalysisResult } from "../../lib/market";
 
 function toneColor(stance: string): "green" | "amber" | "red" | "cyan" {
@@ -21,19 +22,19 @@ type ThesisEvidencePanelProps = {
 };
 
 export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
+  const { t, formatDateTime, formatNumber } = useLocale();
+
   if (!macroRole) {
     return (
       <div className="extension-card thesis-evidence-card">
         <div className="extension-card-headline">
           <div>
-            <span className="section-label">Macro Evidence</span>
-            <h3>Thesis evidence</h3>
+            <span className="section-label">{t("macro.kicker")}</span>
+            <h3>{t("macro.title")}</h3>
           </div>
-          <Badge color="amber">pending</Badge>
+          <Badge color="amber">{t("macro.pending")}</Badge>
         </div>
-        <div className="empty-state">
-          Run analysis to populate source-linked macro/news evidence for the current thesis.
-        </div>
+        <div className="empty-state">{t("macro.empty")}</div>
       </div>
     );
   }
@@ -44,8 +45,8 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
     <div className="extension-card thesis-evidence-card">
       <div className="extension-card-headline">
         <div>
-          <span className="section-label">Macro Evidence</span>
-          <h3>Thesis evidence</h3>
+          <span className="section-label">{t("macro.kicker")}</span>
+          <h3>{t("macro.title")}</h3>
         </div>
         <Badge color={toneColor(thesis?.stance ?? macroRole.signal_bias)}>
           {thesis?.stance ?? macroRole.signal_bias}
@@ -57,12 +58,12 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
       {thesis ? (
         <div className="macro-regime-row">
           <div>
-            <span className="section-label">Regime</span>
+            <span className="section-label">{t("macro.regime")}</span>
             <strong>{thesis.regime}</strong>
           </div>
           <div>
-            <span className="section-label">Confidence</span>
-            <strong>{Math.round(macroRole.confidence * 100)}%</strong>
+            <span className="section-label">{t("macro.confidence")}</span>
+            <strong>{formatNumber(macroRole.confidence * 100)}%</strong>
           </div>
         </div>
       ) : null}
@@ -71,7 +72,7 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
         <section className="evidence-block">
           <div className="evidence-block-head">
             <Radar size={16} />
-            <strong>Catalysts</strong>
+            <strong>{t("macro.catalysts")}</strong>
           </div>
           <div className="evidence-list">
             {(thesis?.catalysts ?? []).map((item) => (
@@ -100,14 +101,14 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
         <section className="evidence-block">
           <div className="evidence-block-head">
             <ShieldAlert size={16} />
-            <strong>Watch items</strong>
+            <strong>{t("macro.watchItems")}</strong>
           </div>
           <div className="evidence-list">
             {(thesis?.watch_items ?? []).map((item) => (
               <article className="evidence-row" key={`${item.label}-${item.trigger}`}>
                 <div className="event-head">
                   <span className="event-type">{item.label}</span>
-                  <span>watch</span>
+                  <span>{t("macro.watch")}</span>
                 </div>
                 <p>{item.trigger}</p>
                 <small>{item.implication}</small>
@@ -120,7 +121,7 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
       <section className="source-block">
         <div className="evidence-block-head">
           <Newspaper size={16} />
-          <strong>Linked sources</strong>
+          <strong>{t("macro.sources")}</strong>
         </div>
         <div className="source-list">
           {macroRole.sources.map((source) => (
@@ -133,10 +134,10 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
               {source.url ? (
                 <a href={source.url} target="_blank" rel="noreferrer" className="source-link">
                   <Globe2 size={14} />
-                  Open
+                  {t("macro.open")}
                 </a>
               ) : (
-                <span className="source-link source-link-muted">Local</span>
+                <span className="source-link source-link-muted">{t("macro.local")}</span>
               )}
             </article>
           ))}

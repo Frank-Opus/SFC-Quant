@@ -1,6 +1,8 @@
-# dSFC-Quant Backend
+# SFC-Quant Backend
 
-FastAPI control plane for the local-first dSFC-Quant workstation.
+FastAPI control plane for the local-first SFC-Quant workstation.
+
+Repository/runtime identifier: `dSFC-Quant`
 
 ## Responsibilities
 
@@ -40,6 +42,12 @@ uvicorn app.main:app --app-dir backend --reload
 
 Default local URL: `http://localhost:8000`
 
+The default release profile keeps `APP_MODE=mock` and `EXECUTION_MODE=paper`
+while setting `MARKET_DATA_MODE=real`. The backend requests real market reads
+through the existing ccxt seam and reports requested/effective source truthfully.
+If the exchange read fails, the backend degrades honestly and does not substitute
+mock snapshots as if they were live market data.
+
 ## Operations Endpoints
 
 - `GET /health`
@@ -63,7 +71,7 @@ The backend emits JSON logs to stdout. Event publication, startup, and shutdown 
 
 ## Safety Boundaries
 
-- mock-safe mode is the default
+- the default release profile keeps execution paper-first while requesting real market data
 - paper trading is the default execution path
 - live mode requires explicit confirmation and credentials
 - strategy generation produces review artifacts only

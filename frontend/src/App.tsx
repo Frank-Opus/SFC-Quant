@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Bot,
   Cable,
+  ChevronRight,
   Flame,
   Gauge,
   Play,
@@ -35,77 +36,108 @@ import {
   CardTitle,
 } from "./components/ui/card";
 import { useMarketRuntime } from "./hooks/useMarketRuntime";
+import { useLocale } from "./lib/i18n";
+import {
+  deriveDashboardEventSummary,
+  deriveDashboardViewModel,
+  type DashboardDigestItem,
+  type DashboardEventSummary,
+} from "./lib/dashboard-derive";
 import type { AgentAnalysisResult, EventEnvelope, ExecutionOrder, MarketSnapshot } from "./lib/market";
 
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatPercent(value: number): string {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
-}
+type WorkspaceSection =
+  | "overview"
+  | "market"
+  | "thesis"
+  | "strategy"
+  | "analytics"
+  | "operations"
+  | "diagnostics";
 
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-function describeEvent(event: EventEnvelope): string {
+function describeEvent(
+  event: EventEnvelope,
+  helpers: {
+    t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string;
+    formatRecommendation: (
+      recommendation: "buy" | "sell" | "hold" | "reduce" | "wait",
+      options?: { uppercase?: boolean },
+    ) => string;
+  },
+): string {
   const payload = event.payload;
 
   switch (event.event_type) {
     case "system.warning":
-      return String(payload.message ?? "Runtime warning surfaced.");
+      return String(payload.message ?? helpers.t("event.realtimeWarningFallback"));
     case "system.connected":
-      return "Realtime session established.";
+      return helpers.t("event.systemConnected");
     case "market.snapshot":
-      return "Market snapshot refreshed from backend runtime.";
+      return helpers.t("event.marketSnapshot");
     case "market.tick":
-      return `${String(payload.symbol ?? "Market")} ${String(payload.timeframe ?? "1m")} tick updated.`;
+      return helpers.t("event.marketTick", {
+        symbol: String(payload.symbol ?? "Market"),
+        timeframe: String(payload.timeframe ?? "1m"),
+      });
     case "agent.analysis.requested":
-      return `Analysis requested for ${String(payload.symbol ?? "selected instrument")}.`;
+      return helpers.t("event.analysisRequested", {
+        symbol: String(payload.symbol ?? "selected instrument"),
+      });
     case "agent.analysis.completed":
-      return `PrimoAgent completed ${String(payload.symbol ?? "instrument")} analysis.`;
+      return helpers.t("event.analysisCompleted", {
+        symbol: String(payload.symbol ?? "instrument"),
+      });
     case "execution.signal.approved":
-      return `Signal approved for ${String(payload.symbol ?? "instrument")} ${String(payload.side ?? "")}.`;
+      return helpers.t("event.signalApproved", {
+        symbol: String(payload.symbol ?? "instrument"),
+        side: helpers.formatRecommendation(
+          String(payload.side ?? "hold") as "buy" | "sell" | "hold" | "reduce" | "wait",
+        ),
+      });
     case "execution.signal.blocked":
     case "execution.signal.skipped":
-      return String(payload.reason ?? "Signal did not become an order.");
+      return String(payload.reason ?? helpers.t("event.signalNotOrder"));
     case "execution.order.filled":
-      return `${String(payload.symbol ?? "Instrument")} ${String(payload.side ?? "order")} filled.`;
+      return helpers.t("event.orderFilled", {
+        symbol: String(payload.symbol ?? "Instrument"),
+        side: helpers.formatRecommendation(
+          String(payload.side ?? "hold") as "buy" | "sell" | "hold" | "reduce" | "wait",
+        ),
+      });
     case "execution.engine.paused":
-      return String(payload.reason ?? "Execution engine paused.");
+      return String(payload.reason ?? helpers.t("event.enginePaused"));
     case "execution.engine.resumed":
-      return "Execution engine resumed.";
+      return helpers.t("event.engineResumed");
     case "risk.policy.updated":
-      return "Risk guardrails updated.";
+      return helpers.t("event.riskUpdated");
     case "risk.approval.denied":
-      return `Risk approval denied for ${String(payload.symbol ?? "instrument")}.`;
+      return helpers.t("event.approvalDenied", {
+        symbol: String(payload.symbol ?? "instrument"),
+      });
     case "risk.approval.granted":
-      return `Risk approval granted for ${String(payload.symbol ?? "instrument")}.`;
+      return helpers.t("event.approvalGranted", {
+        symbol: String(payload.symbol ?? "instrument"),
+      });
     case "risk.halt.triggered":
-      return String(payload.reason ?? "Risk halt engaged.");
+      return String(payload.reason ?? helpers.t("event.riskHaltTriggered"));
     case "risk.halt.cleared":
-      return "Risk halt cleared.";
+      return helpers.t("event.riskHaltCleared");
     case "risk.live_mode.enabled":
     case "risk.live_mode.disabled":
-      return String(payload.message ?? "Live mode state updated.");
+      return String(payload.message ?? helpers.t("event.liveModeUpdated"));
     case "strategy.factory.config.updated":
-      return String(payload.reason ?? "Strategy Factory configuration updated.");
+      return String(payload.reason ?? helpers.t("event.strategyFactoryUpdated"));
+    case "strategy.factory.started":
+      return helpers.t("event.strategyStarted");
     case "strategy.factory.generated":
-      return `Strategy artifact generated for ${String(payload.symbol ?? "instrument")}.`;
+      return helpers.t("event.strategyGenerated", {
+        symbol: String(payload.symbol ?? "instrument"),
+      });
     case "strategy.factory.failed":
-      return String(payload.reason ?? "Strategy generation failed.");
+      return String(payload.reason ?? helpers.t("event.strategyFailed"));
     default:
       return event.event_type;
   }
@@ -148,17 +180,17 @@ function computeRiskScore(args: {
   return Math.round(Math.max(4, Math.min(100, score)));
 }
 
-function riskLabel(score: number): string {
+function riskLabelKey(score: number): string {
   if (score >= 80) {
-    return "Critical";
+    return "risk.critical";
   }
   if (score >= 55) {
-    return "Elevated";
+    return "risk.elevated";
   }
   if (score >= 30) {
-    return "Guarded";
+    return "risk.guarded";
   }
-  return "Calm";
+  return "risk.calm";
 }
 
 function riskTone(score: number): "green" | "amber" | "red" | "cyan" {
@@ -204,11 +236,161 @@ function markerPosition(recommendation: string): "aboveBar" | "belowBar" | "inBa
   return "inBar";
 }
 
-function summariseRole(role: AgentAnalysisResult): string {
-  return `${role.role.replaceAll("_", " ")} ${Math.round(role.confidence * 100)}%`;
+function summariseRole(
+  role: AgentAnalysisResult,
+  helpers: {
+    formatRole: (role: AgentAnalysisResult["role"]) => string;
+    formatPercent: (value: number, showPlus?: boolean) => string;
+  },
+): string {
+  return `${helpers.formatRole(role.role)} ${helpers.formatPercent(role.confidence * 100, false)}`;
+}
+
+function resolveMarketSourceLabel(
+  source: string,
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string,
+): string {
+  const key = `runtime.marketSource.${source}`;
+  const translated = t(key);
+  return translated === key ? source : translated;
+}
+
+function resolveMarketStatusLabel(
+  status: string,
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string,
+): string {
+  const key = `runtime.marketStatus.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
+}
+
+function formatConnectionStatus(
+  connectionStatus: "connecting" | "live" | "reconnecting" | "degraded" | "closed",
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string,
+): string {
+  return t(`connection.${connectionStatus}`);
+}
+
+function formatLocalizedConnectionMessage(args: {
+  connectionStatus: "connecting" | "live" | "reconnecting" | "degraded" | "closed";
+  reconnectAttempts: number;
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string;
+}): string {
+  if (args.connectionStatus === "live") {
+    return args.reconnectAttempts === 0
+      ? args.t("connection.message.live")
+      : args.t("connection.message.restored");
+  }
+  if (args.connectionStatus === "reconnecting") {
+    return args.t("connection.message.reconnecting", { count: args.reconnectAttempts });
+  }
+  if (args.connectionStatus === "degraded") {
+    return args.t("connection.message.degraded");
+  }
+  if (args.connectionStatus === "closed") {
+    return args.t("connection.message.closed");
+  }
+  return args.t("connection.message.connecting");
+}
+
+function formatAnalysisStatus(
+  status: "completed" | "fallback" | null,
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string,
+): string {
+  if (status === "completed") {
+    return t("strategy.generation.completed");
+  }
+  if (status === "fallback") {
+    return t("runtime.systemStatus.fallback");
+  }
+  return t("thesis.pending");
+}
+
+function formatEventSummaryLabels(
+  event: EventEnvelope,
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string,
+): DashboardEventSummary & { trackLabel: string; outcomeLabel: string } {
+  const summary = deriveDashboardEventSummary(event);
+  return {
+    ...summary,
+    trackLabel: t(`event.track.${summary.track}`),
+    outcomeLabel: t(`event.outcome.${summary.outcome}`),
+  };
+}
+
+function formatDigestItem(args: {
+  item: DashboardDigestItem;
+  t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => string;
+  formatTime: (value: string | number | Date) => string;
+  formatRecommendation: (
+    recommendation: "buy" | "sell" | "hold" | "reduce" | "wait",
+    options?: { uppercase?: boolean },
+  ) => string;
+}): { label: string; value: string; meta: string } {
+  const { item, t, formatTime, formatRecommendation } = args;
+
+  switch (item.id) {
+    case "execution":
+      return {
+        label: t("hero.execution"),
+        value: `${
+          item.engineStatus === "running" ? t("operator.executionActive") : t("operator.executionPaused")
+        } · ${item.executionMode.toUpperCase()}`,
+        meta: item.lastRunId ? item.lastRunId.slice(0, 8) : t("diagnostics.noneYet"),
+      };
+    case "market": {
+      const requested = resolveMarketSourceLabel(item.requestedSource, t);
+      const effective = resolveMarketSourceLabel(item.effectiveSource, t);
+      const status = resolveMarketStatusLabel(item.marketStatus, t);
+      return {
+        label: t("runtime.marketRequested"),
+        value: `${requested} -> ${effective}`,
+        meta: item.latestEventAt ? `${status} · ${formatTime(item.latestEventAt)}` : status,
+      };
+    }
+    case "system":
+      return {
+        label: t("runtime.systemStatus"),
+        value: formatConnectionStatus(item.connectionStatus, t),
+        meta: formatLocalizedConnectionMessage({
+          connectionStatus: item.connectionStatus,
+          reconnectAttempts: item.reconnectAttempts,
+          t,
+        }),
+      };
+    case "thesis":
+      return {
+        label: t("thesis.title"),
+        value: item.recommendation
+          ? `${formatRecommendation(item.recommendation, { uppercase: true })} · ${formatAnalysisStatus(item.status, t)}`
+          : t("thesis.pending"),
+        meta: item.symbol && item.timeframe ? `${item.symbol} · ${item.timeframe}` : t("thesis.empty"),
+      };
+    case "strategy":
+      return {
+        label: t("strategy.title"),
+        value: `${
+          item.enabled ? t(`strategy.generation.${item.generationStatus}`) : t("strategy.disabled")
+        } · ${item.effectiveProvider}`,
+        meta: item.enabled
+          ? `${t("strategy.artifacts")} ${item.artifactCount}`
+          : t("strategy.ready"),
+      };
+  }
 }
 
 export default function App() {
+  const {
+    locale,
+    setLocale,
+    t,
+    formatCompactNumber,
+    formatCurrency,
+    formatPercent,
+    formatTime,
+    formatRecommendation,
+    formatRole,
+  } = useLocale();
   const {
     snapshot,
     execution,
@@ -238,6 +420,64 @@ export default function App() {
     generateStrategyAction,
   } = useMarketRuntime();
   const [liveConfirmationText, setLiveConfirmationText] = useState("");
+  const [activeSection, setActiveSection] = useState<WorkspaceSection>("overview");
+
+  const viewModel = useMemo(
+    () =>
+      deriveDashboardViewModel({
+        snapshot,
+        execution,
+        risk,
+        strategyStatus,
+        latestAnalysis,
+        connectionStatus,
+        reconnectAttempts,
+        lastEventAt,
+        eventFeed,
+      }),
+    [
+      connectionStatus,
+      eventFeed,
+      execution,
+      lastEventAt,
+      latestAnalysis,
+      reconnectAttempts,
+      risk,
+      snapshot,
+      strategyStatus,
+    ],
+  );
+
+  const marketData = snapshot.market_data ?? snapshot.runtime?.market_data ?? {
+    mode: "mock",
+    requested_source: "mock",
+    effective_source: "mock",
+    status: "fallback",
+    fallback_active: true,
+    detail: "Market runtime metadata unavailable.",
+  };
+  const marketStatusValue =
+    typeof marketData.status === "string" ? marketData.status.toLowerCase() : "fallback";
+
+  const describedEvent = useMemo(
+    () =>
+      (event: EventEnvelope) =>
+        describeEvent(event, {
+          t,
+          formatRecommendation,
+        }),
+    [formatRecommendation, t],
+  );
+
+  const localizedConnectionMessage = useMemo(
+    () =>
+      formatLocalizedConnectionMessage({
+        connectionStatus,
+        reconnectAttempts,
+        t,
+      }),
+    [connectionStatus, reconnectAttempts, t],
+  );
 
   const selectedMarket = useMemo(
     () =>
@@ -274,15 +514,13 @@ export default function App() {
   );
 
   const priceMarkers = useMemo<PriceMarker[]>(() => {
-    const markers: PriceMarker[] = selectedRecentOrders.slice(0, 4).map(
-      (order: ExecutionOrder) => ({
+    const markers: PriceMarker[] = selectedRecentOrders.slice(0, 4).map((order: ExecutionOrder) => ({
       time: order.filled_at ?? order.created_at,
       position: order.side === "buy" ? "belowBar" : "aboveBar",
       shape: order.side === "buy" ? "arrowUp" : "arrowDown",
       color: order.side === "buy" ? "#82ffbe" : "#ff8578",
-      text: `${order.side.toUpperCase()} ${formatCompact(order.requested_notional)}`,
-      }),
-    );
+      text: `${formatRecommendation(order.side, { uppercase: true })} ${formatCompactNumber(order.requested_notional)}`,
+    }));
 
     if (latestAnalysis && selectedMarket) {
       markers.unshift({
@@ -290,14 +528,14 @@ export default function App() {
         position: markerPosition(latestAnalysis.overall_recommendation),
         shape: markerShape(latestAnalysis.overall_recommendation),
         color: markerColor(latestAnalysis.overall_recommendation),
-        text: `${latestAnalysis.overall_recommendation.toUpperCase()} ${Math.round(
-          (latestAnalysis.outputs.at(-1)?.confidence ?? 0) * 100,
-        )}%`,
+        text: `${formatRecommendation(latestAnalysis.overall_recommendation, {
+          uppercase: true,
+        })} ${Math.round((latestAnalysis.outputs.at(-1)?.confidence ?? 0) * 100)}%`,
       });
     }
 
     return markers;
-  }, [latestAnalysis, selectedMarket, selectedRecentOrders]);
+  }, [formatCompactNumber, formatRecommendation, latestAnalysis, selectedMarket, selectedRecentOrders]);
 
   const riskScore = useMemo(
     () =>
@@ -317,13 +555,6 @@ export default function App() {
     ? unrealizedPnl - selectedPosition.unrealized_pnl
     : unrealizedPnl;
 
-  const connectionTone =
-    connectionStatus === "live"
-      ? "live"
-      : connectionStatus === "reconnecting"
-        ? "reconnecting"
-        : connectionStatus;
-
   const signalLogEvents = useMemo(
     () =>
       eventFeed
@@ -337,6 +568,8 @@ export default function App() {
         .slice(0, 8),
     [eventFeed],
   );
+
+  const thesisEvents = useMemo(() => eventFeed.slice(0, 8), [eventFeed]);
 
   const heatmapCells = useMemo<HeatmapCell[]>(
     () =>
@@ -370,584 +603,1090 @@ export default function App() {
 
     return [
       {
-        label: "Trend",
+        label: t("factor.trend"),
         value: clampScore(Math.abs(selectedMarket?.change_percent ?? 0) * 18 + 28),
       },
       {
-        label: "Momentum",
+        label: t("factor.momentum"),
         value: clampScore((technicalRole?.confidence ?? 0.4) * 100),
       },
       {
-        label: "Macro",
+        label: t("factor.macro"),
         value: clampScore((macroRole?.confidence ?? 0.38) * 100),
       },
       {
-        label: "Execution",
+        label: t("factor.execution"),
         value: clampScore(executionReadiness),
       },
       {
-        label: "Risk Buffer",
+        label: t("factor.riskBuffer"),
         value: clampScore(100 - riskScore + (dataRole?.confidence ?? 0.4) * 12),
       },
     ];
-  }, [execution.engine_status, latestAnalysis?.outputs, risk.halted, risk.live_mode_enabled, riskScore, selectedMarket?.change_percent]);
+  }, [
+    execution.engine_status,
+    latestAnalysis?.outputs,
+    risk.halted,
+    risk.live_mode_enabled,
+    riskScore,
+    selectedMarket?.change_percent,
+    t,
+  ]);
 
   const thesisMacroRole = useMemo(
     () => latestAnalysis?.outputs.find((role) => role.role === "news_geopolitics") ?? null,
     [latestAnalysis?.outputs],
   );
 
-  return (
-    <main className="app-shell dashboard-shell">
-      <motion.section
-        className="hero-panel hero-dashboard"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45 }}
-      >
-        <div className="hero-copy">
-          <div className="hero-topline">
-            <p className="eyebrow">Phase 8 / Strategy Factory & Macro Extensions</p>
-            <Badge color={snapshot.runtime.app_mode === "mock" ? "amber" : "cyan"}>
-              {snapshot.runtime.runtime_mode}
+  const systemStatusLabel = useMemo(
+    () => t(`runtime.systemStatus.${viewModel.systemStatus}`),
+    [t, viewModel.systemStatus],
+  );
+
+  const digestCards = useMemo(
+    () =>
+      viewModel.digestItems.map((item) => ({
+        item,
+        content: formatDigestItem({
+          item,
+          t,
+          formatTime,
+          formatRecommendation,
+        }),
+      })),
+    [formatRecommendation, formatTime, t, viewModel.digestItems],
+  );
+
+  const marketStatusLabel = useMemo(
+    () => resolveMarketStatusLabel(marketStatusValue, t),
+    [marketStatusValue, t],
+  );
+
+  const marketEmptyStateMessage = useMemo(() => {
+    if (viewModel.realSourceRequested) {
+      return `${t("marketDeck.emptyReal")} ${t("marketDeck.emptyHint")}`;
+    }
+    return t("marketDeck.empty");
+  }, [t, viewModel.realSourceRequested]);
+
+  const heroProviderLabel = snapshot.runtime.ai_model
+    ? `${snapshot.runtime.ai_provider} / ${snapshot.runtime.ai_model}`
+    : snapshot.runtime.ai_provider;
+  const selectedMarketBadge = selectedMarket
+    ? `${selectedMarket.symbol} · ${selectedMarket.timeframe}`
+    : snapshot.runtime.exchange_id;
+  const selectedMarketHeroValue = selectedMarket
+    ? formatCurrency(selectedMarket.last_price)
+    : systemStatusLabel;
+  const selectedMarketHeroMeta = selectedMarket
+    ? formatPercent(selectedMarket.change_percent)
+    : localizedConnectionMessage;
+  const marketDigestCard = digestCards.find(({ item }) => item.id === "market")?.content;
+  const denseOverviewItems = useMemo(
+    () => [
+      {
+        id: "selected",
+        label: t("marketDeck.selected"),
+        value: selectedMarket ? `${selectedMarket.symbol} · ${selectedMarket.timeframe}` : systemStatusLabel,
+        detail: selectedMarket
+          ? `${formatCurrency(selectedMarket.last_price)} · ${formatPercent(selectedMarket.change_percent)}`
+          : localizedConnectionMessage,
+      },
+      {
+        id: "tape",
+        label: t("analytics.signalLog.title"),
+        value: String(signalLogEvents.length),
+        detail:
+          signalLogEvents.length > 0
+            ? t("analytics.signalLog.entries", { count: signalLogEvents.length })
+            : t("analytics.signalLog.waiting"),
+      },
+      {
+        id: "positions",
+        label: t("kpi.positions"),
+        value: `${execution.positions.length} · ${formatCurrency(totalExposure)}`,
+        detail: `${t("kpi.unrealized")} · ${formatCurrency(unrealizedPnl)}`,
+      },
+      {
+        id: "strategy",
+        label: t("extensions.title"),
+        value: strategyStatus.enabled ? t("strategy.enabled") : t("strategy.disabled"),
+        detail:
+          strategyStatus.generation.detail ??
+          `${t(`strategy.generation.${strategyStatus.generation.status}`)} · ${strategyStatus.effective_provider}`,
+      },
+    ],
+    [
+      execution.positions.length,
+      formatCurrency,
+      formatPercent,
+      localizedConnectionMessage,
+      selectedMarket,
+      signalLogEvents.length,
+      strategyStatus.effective_provider,
+      strategyStatus.enabled,
+      strategyStatus.generation.detail,
+      strategyStatus.generation.status,
+      systemStatusLabel,
+      t,
+      totalExposure,
+      unrealizedPnl,
+    ],
+  );
+  const railWatchlistItems = useMemo(() => snapshot.snapshots.slice(0, 4), [snapshot.snapshots]);
+
+  const navigationItems = [
+    {
+      id: "overview" as const,
+      icon: Activity,
+      label: t("shell.overviewTitle"),
+      meta: systemStatusLabel,
+    },
+    {
+      id: "market" as const,
+      icon: Radar,
+      label: t("marketDeck.title"),
+      meta: t("marketDeck.feeds", { count: snapshot.snapshots.length }),
+    },
+    {
+      id: "thesis" as const,
+      icon: Bot,
+      label: t("thesis.title"),
+      meta: latestAnalysis
+        ? formatRecommendation(latestAnalysis.overall_recommendation, {
+            uppercase: true,
+          })
+        : t("thesis.pending"),
+    },
+    {
+      id: "strategy" as const,
+      icon: Gauge,
+      label: t("extensions.title"),
+      meta: strategyStatus.enabled ? t("strategy.enabled") : t("strategy.disabled"),
+    },
+    {
+      id: "analytics" as const,
+      icon: ArrowUpRight,
+      label: t("analytics.title"),
+      meta: t("analytics.signalLog.entries", { count: signalLogEvents.length }),
+    },
+    {
+      id: "operations" as const,
+      icon: ShieldCheck,
+      label: t("operator.title"),
+      meta:
+        execution.engine_status === "running"
+          ? t("operator.executionActive")
+          : t("operator.executionPaused"),
+    },
+    {
+      id: "diagnostics" as const,
+      icon: AlertTriangle,
+      label: t("diagnostics.title"),
+      meta: t("diagnostics.warnings", { count: snapshot.runtime.warnings.length }),
+    },
+  ];
+
+  const activeNavigationItem =
+    navigationItems.find((item) => item.id === activeSection) ?? navigationItems[0];
+
+  const marketDeckPanel = (
+    <Card className="panel-card market-deck workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("marketDeck.kicker")}</p>
+          <CardTitle>{t("marketDeck.title")}</CardTitle>
+          <CardDescription>{t("marketDeck.description")}</CardDescription>
+        </div>
+        <Badge color="cyan">{t("marketDeck.feeds", { count: snapshot.snapshots.length })}</Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="instrument-strip">
+          {snapshot.snapshots.map((item: MarketSnapshot) => {
+            const active =
+              item.symbol === selectedMarket?.symbol &&
+              item.timeframe === selectedMarket?.timeframe;
+            return (
+              <button
+                className="instrument-pill"
+                data-active={active}
+                key={`${item.symbol}:${item.timeframe}`}
+                onClick={() =>
+                  setSelectedInstrument({ symbol: item.symbol, timeframe: item.timeframe })
+                }
+                type="button"
+              >
+                <div>
+                  <strong>{item.symbol}</strong>
+                  <span>{item.timeframe}</span>
+                </div>
+                <small data-positive={item.change_percent >= 0}>
+                  {formatPercent(item.change_percent)}
+                </small>
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedMarket ? (
+          <>
+            <div className="market-spotlight">
+              <div>
+                <span className="section-label">{t("marketDeck.selected")}</span>
+                <h2>{selectedMarket.symbol}</h2>
+              </div>
+              <div className="spotlight-metric">
+                <strong>{formatCurrency(selectedMarket.last_price)}</strong>
+                <span data-positive={selectedMarket.change_percent >= 0}>
+                  {formatPercent(selectedMarket.change_percent)}
+                </span>
+              </div>
+              <div className="spotlight-metric compact">
+                <span>{t("marketDeck.volume")}</span>
+                <strong>{formatCompactNumber(selectedMarket.volume_24h)}</strong>
+              </div>
+            </div>
+            <PriceChart
+              candles={selectedMarket.candles}
+              markers={priceMarkers}
+              symbol={selectedMarket.symbol}
+              timeframe={selectedMarket.timeframe}
+            />
+            <PnlChart
+              candles={selectedMarket.candles}
+              quantity={selectedPosition?.quantity ?? 0}
+              averageEntryPrice={selectedPosition?.avg_entry_price ?? selectedMarket.last_price}
+              realizedPnl={risk.daily_realized_pnl}
+              offsetPnl={nonSelectedUnrealized}
+            />
+          </>
+        ) : (
+          <div className="empty-state">{marketEmptyStateMessage}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const thesisPanel = (
+    <Card className="panel-card thesis-panel workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("thesis.kicker")}</p>
+          <CardTitle>{t("thesis.title")}</CardTitle>
+          <CardDescription>{t("thesis.description")}</CardDescription>
+        </div>
+        <Badge color={latestAnalysis?.status === "fallback" ? "amber" : "green"}>
+          {latestAnalysis ? formatAnalysisStatus(latestAnalysis.status, t) : t("thesis.pending")}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        {latestAnalysis ? (
+          <div className="thesis-layout">
+            <div className="thesis-summary-card">
+              <div className="thesis-summary-header">
+                <div>
+                  <span className="section-label">{t("thesis.recommendation")}</span>
+                  <h3>
+                    {formatRecommendation(latestAnalysis.overall_recommendation, {
+                      uppercase: true,
+                    })}
+                  </h3>
+                </div>
+                <Badge color={riskTone(riskScore) === "red" ? "red" : "cyan"}>
+                  {latestAnalysis.provider}
+                </Badge>
+              </div>
+              <p>{latestAnalysis.outputs.at(-1)?.summary ?? t("thesis.noSummary")}</p>
+              <div className="thesis-role-grid">
+                {latestAnalysis.outputs.map((role) => (
+                  <article className="thesis-role-card" key={role.role}>
+                    <div className="role-icon">
+                      {role.role === "data" ? (
+                        <Radar size={18} />
+                      ) : role.role === "technical_analysis" ? (
+                        <Gauge size={18} />
+                      ) : role.role === "news_geopolitics" ? (
+                        <Activity size={18} />
+                      ) : (
+                        <ShieldCheck size={18} />
+                      )}
+                    </div>
+                    <div>
+                      <strong>
+                        {summariseRole(role, {
+                          formatRole,
+                          formatPercent,
+                        })}
+                      </strong>
+                      <p>{role.summary}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="event-panel compact-panel">
+              <div className="section-kicker">
+                <span className="section-label">{t("tape.kicker")}</span>
+                <Badge color="cyan">{t("tape.frames", { count: thesisEvents.length })}</Badge>
+              </div>
+              <div className="event-feed">
+                {thesisEvents.map((event) => {
+                  const eventSummary = formatEventSummaryLabels(event, t);
+                  return (
+                    <article
+                      className="event-row"
+                      data-tone={eventSummary.tone}
+                      key={`${event.event_id}-${event.generated_at}`}
+                    >
+                      <div className="event-head event-head-operator">
+                        <span className="event-track">{eventSummary.trackLabel}</span>
+                        <strong className="event-outcome">{eventSummary.outcomeLabel}</strong>
+                        <span>{formatTime(event.generated_at)}</span>
+                      </div>
+                      <p>{describedEvent(event)}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-state">{t("thesis.empty")}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const extensionPanel = (
+    <Card className="panel-card extension-panel workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("extensions.kicker")}</p>
+          <CardTitle>{t("extensions.title")}</CardTitle>
+          <CardDescription>{t("extensions.description")}</CardDescription>
+        </div>
+        <Badge color={strategyStatus.enabled ? "green" : "amber"}>
+          {strategyStatus.enabled ? t("strategy.enabled") : t("strategy.disabled")}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="extension-grid">
+          <ThesisEvidencePanel macroRole={thesisMacroRole} />
+          <StrategyFactoryPanel
+            status={strategyStatus}
+            artifacts={strategyArtifacts}
+            pendingAction={pendingAction}
+            onToggle={toggleStrategyFactoryAction}
+            onGenerate={generateStrategyAction}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const analyticsPanel = (
+    <Card className="panel-card analytics-panel workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("analytics.kicker")}</p>
+          <CardTitle>{t("analytics.title")}</CardTitle>
+          <CardDescription>{t("analytics.description")}</CardDescription>
+        </div>
+        <Badge color="cyan">
+          {t("analytics.signalLog.entries", { count: signalLogEvents.length })}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="analytics-grid">
+          <SignalLog
+            events={signalLogEvents}
+            latestAnalysis={latestAnalysis}
+            describeEvent={describedEvent}
+            summarizeEvent={(event) => formatEventSummaryLabels(event, t)}
+          />
+          <div className="analytics-side-grid">
+            <PositionsHeatmap cells={heatmapCells} />
+            <FactorRadar
+              axes={factorAxes}
+              recommendation={latestAnalysis?.overall_recommendation ?? "hold"}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const operatorPanel = (
+    <Card className="panel-card operator-panel workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("operator.kicker")}</p>
+          <CardTitle>{t("operator.title")}</CardTitle>
+          <CardDescription>{t("operator.description")}</CardDescription>
+        </div>
+        <Badge color={execution.engine_status === "running" ? "green" : "amber"}>
+          {execution.engine_status === "running"
+            ? t("operator.executionActive")
+            : t("operator.executionPaused")}
+        </Badge>
+      </CardHeader>
+      <CardContent className="operator-stack">
+        <div className="operator-card-grid">
+          <div className="operator-card">
+            <div className="operator-title-row">
+              <div>
+                <span className="section-label">{t("operator.execution")}</span>
+                <h3>
+                  {execution.engine_status === "running"
+                    ? t("operator.executionActive")
+                    : t("operator.executionPaused")}
+                </h3>
+              </div>
+              {execution.engine_status === "running" ? (
+                <Play size={18} className="operator-icon active" />
+              ) : (
+                <Slash size={18} className="operator-icon paused" />
+              )}
+            </div>
+            <p>{execution.paused_reason ?? t("operator.engineReady")}</p>
+            <div className="operator-actions two-up">
+              <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
+                <Bot size={16} />
+                {t("operator.runAnalysis")}
+              </Button>
+              <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
+                <ArrowUpRight size={16} />
+                {t("operator.dispatchPaper")}
+              </Button>
+              {execution.engine_status === "running" ? (
+                <Button variant="danger" onClick={pauseExecutionAction} disabled={Boolean(pendingAction)}>
+                  <Slash size={16} />
+                  {t("operator.pauseEngine")}
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={resumeExecutionAction} disabled={Boolean(pendingAction)}>
+                  <Play size={16} />
+                  {t("operator.resumeEngine")}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="operator-card">
+            <div className="operator-title-row">
+              <div>
+                <span className="section-label">{t("operator.risk")}</span>
+                <h3>{risk.halted ? t("operator.riskHalt") : t("operator.riskActive")}</h3>
+              </div>
+              {risk.halted ? (
+                <ShieldAlert size={18} className="operator-icon risk" />
+              ) : (
+                <ShieldCheck size={18} className="operator-icon safe" />
+              )}
+            </div>
+            <p>
+              {risk.halt_reason ??
+                (risk.policy.require_agent_approval
+                  ? t("operator.approvalRequired")
+                  : t("operator.approvalOptional"))}
+            </p>
+            <div className="policy-strip">
+              <span>
+                {t("operator.maxPosition", {
+                  value: formatCurrency(risk.policy.max_position_notional_usd),
+                })}
+              </span>
+              <span>
+                {t("operator.dailyLoss", {
+                  value: formatCurrency(risk.policy.daily_loss_limit_usd),
+                })}
+              </span>
+            </div>
+            <div className="operator-actions two-up">
+              {risk.halted ? (
+                <Button variant="secondary" onClick={clearRiskHaltAction} disabled={Boolean(pendingAction)}>
+                  <ShieldCheck size={16} />
+                  {t("operator.clearHalt")}
+                </Button>
+              ) : (
+                <Button variant="danger" onClick={engageRiskHaltAction} disabled={Boolean(pendingAction)}>
+                  <Flame size={16} />
+                  {t("operator.engageHalt")}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="operator-card live-card" data-armed={risk.live_mode_enabled}>
+          <div className="operator-title-row">
+            <div>
+              <span className="section-label">{t("operator.liveGate")}</span>
+              <h3>{risk.live_mode_enabled ? t("operator.liveEnabled") : t("operator.liveLocked")}</h3>
+            </div>
+            <Badge color={risk.live_mode_enabled ? "red" : "amber"}>
+              {risk.live_mode_enabled ? t("operator.liveArmed") : t("operator.livePaperFirst")}
             </Badge>
           </div>
-          <h1>Operator cockpit for explainable AI execution.</h1>
-          <p className="lede">
-            Live metrics, source-linked thesis evidence, and review-first strategy artifacts now
-            share the same local-first surface.
-          </p>
+          <p>{risk.live_mode_reason ?? t("operator.livePrompt")}</p>
+          {!risk.live_mode_enabled ? <p className="live-danger-copy">{t("operator.livePromptDanger")}</p> : null}
+          <div className="live-confirm-row">
+            <input
+              className="live-confirm-input"
+              onChange={(event) => setLiveConfirmationText(event.target.value)}
+              placeholder={t("operator.livePlaceholder")}
+              value={liveConfirmationText}
+            />
+            {risk.live_mode_enabled ? (
+              <Button
+                variant="danger"
+                onClick={() => requestLiveModeAction(false)}
+                disabled={Boolean(pendingAction)}
+              >
+                {t("operator.disable")}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={() => requestLiveModeAction(true, liveConfirmationText)}
+                disabled={Boolean(pendingAction)}
+              >
+                {t("operator.requestEnable")}
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-          <div className="hero-facts">
-            <div>
-              <span>AI Provider</span>
+  const diagnosticsPanel = (
+    <Card className="panel-card diagnostics-card workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("diagnostics.kicker")}</p>
+          <CardTitle>{t("diagnostics.title")}</CardTitle>
+          <CardDescription>{t("diagnostics.description")}</CardDescription>
+        </div>
+        <Badge color={snapshot.runtime.warnings.length > 0 ? "amber" : "green"}>
+          {t("diagnostics.warnings", { count: snapshot.runtime.warnings.length })}
+        </Badge>
+      </CardHeader>
+      <CardContent className="diagnostics-stack">
+        <div className="diagnostic-row">
+          <div>
+            <span className="section-label">{t("diagnostics.cashEquity")}</span>
+            <strong>
+              {formatCurrency(execution.cash_balance)} / {formatCurrency(execution.equity_estimate)}
+            </strong>
+          </div>
+          <ArrowDownRight size={18} className="muted-icon" />
+        </div>
+        <div className="diagnostic-row">
+          <div>
+            <span className="section-label">{t("runtime.marketStatus")}</span>
+            <strong>{marketStatusLabel}</strong>
+          </div>
+          <Activity size={18} className="muted-icon" />
+        </div>
+        <div className="diagnostic-row">
+          <div>
+            <span className="section-label">{t("diagnostics.retries")}</span>
+            <strong>{reconnectAttempts}</strong>
+          </div>
+          <Cable size={18} className="muted-icon" />
+        </div>
+        <div className="diagnostic-row">
+          <div>
+            <span className="section-label">{t("diagnostics.lastAnalysis")}</span>
+            <strong>
+              {execution.last_run_id ? execution.last_run_id.slice(0, 8) : t("diagnostics.noneYet")}
+            </strong>
+          </div>
+          <Bot size={18} className="muted-icon" />
+        </div>
+        <div className="diagnostic-row">
+          <div>
+            <span className="section-label">{t("hero.aiProvider")}</span>
+            <strong>{heroProviderLabel}</strong>
+          </div>
+          <Bot size={18} className="muted-icon" />
+        </div>
+        <div className="diagnostic-row">
+          <div>
+            <span className="section-label">{t("runtime.marketDetail")}</span>
+            <strong>{marketData.detail ?? localizedConnectionMessage}</strong>
+          </div>
+          <AlertTriangle size={18} className="muted-icon" />
+        </div>
+
+        {snapshot.runtime.warnings.length > 0 ? (
+          <div className="warning-list">
+            {snapshot.runtime.warnings.map((warning) => (
+              <div className="warning-row" key={warning}>
+                <AlertTriangle size={16} />
+                <span>{warning}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="quiet-copy">{t("diagnostics.clear")}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const runtimeOverviewPanel = (
+    <Card className="panel-card workspace-card runtime-overview-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("hero.runtimeDigest")}</p>
+          <CardTitle>{t("shell.overviewTitle")}</CardTitle>
+          <CardDescription>{t("shell.overviewDescription")}</CardDescription>
+        </div>
+        <Badge color={viewModel.systemStatus === "normal" ? "green" : viewModel.systemStatus === "fallback" ? "amber" : "red"}>
+          {systemStatusLabel}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="runtime-overview-banner">
+          <span>{t("runtime.marketRequested")}</span>
+          <strong>{marketDigestCard?.value ?? systemStatusLabel}</strong>
+          <p>{marketDigestCard?.meta ?? localizedConnectionMessage}</p>
+        </div>
+        <div className="runtime-overview-grid">
+          <article className="runtime-overview-stat">
+            <span>{t("runtime.marketEffective")}</span>
+            <strong>{resolveMarketSourceLabel(marketData.effective_source, t)}</strong>
+          </article>
+          <article className="runtime-overview-stat">
+            <span>{t("runtime.marketStatus")}</span>
+            <strong>{marketStatusLabel}</strong>
+          </article>
+          <article className="runtime-overview-stat">
+            <span>{t("hero.execution")}</span>
+            <strong>{viewModel.topStates.execution.toUpperCase()}</strong>
+          </article>
+          <article className="runtime-overview-stat">
+            <span>{t("hero.aiProvider")}</span>
+            <strong>{heroProviderLabel}</strong>
+          </article>
+          <article className="runtime-overview-stat">
+            <span>{t("hero.halt")}</span>
+            <strong>
+              {viewModel.topStates.halt === "clear" ? t("hero.haltClear") : t("hero.haltEngaged")}
+            </strong>
+          </article>
+          <article className="runtime-overview-stat">
+            <span>{t("thesis.title")}</span>
+            <strong>
+              {latestAnalysis
+                ? formatRecommendation(latestAnalysis.overall_recommendation, {
+                    uppercase: true,
+                  })
+                : t("thesis.pending")}
+            </strong>
+          </article>
+        </div>
+        <div className="runtime-overview-item">
+          <span>{t("thesis.title")}</span>
+          <strong>
+            {latestAnalysis
+              ? `${latestAnalysis.symbol} · ${latestAnalysis.timeframe}`
+              : t("thesis.pending")}
+          </strong>
+          <p>{latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty")}</p>
+        </div>
+        <div className="runtime-overview-list runtime-overview-list--dense">
+          {denseOverviewItems.map((item) => (
+            <article className="runtime-overview-item runtime-overview-item--compact" key={item.id}>
+              <div className="runtime-overview-line">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const quickActionsCard = (
+    <Card className="panel-card rail-card quick-actions-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("hero.controls")}</p>
+          <CardTitle>{t("operator.title")}</CardTitle>
+          <CardDescription>{t("operator.description")}</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="operator-actions two-up compact-actions-grid">
+          <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
+            <Bot size={16} />
+            {t("operator.runAnalysis")}
+          </Button>
+          <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
+            <ArrowUpRight size={16} />
+            {t("operator.dispatchPaper")}
+          </Button>
+          <Button variant="secondary" onClick={refreshAll} disabled={Boolean(pendingAction)}>
+            <RefreshCcw size={16} />
+            {t("hero.refresh")}
+          </Button>
+          <Button variant="ghost" onClick={reconnect}>
+            <Cable size={16} />
+            {t("hero.reconnect")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const railRuntimeCard = (
+    <Card className="panel-card rail-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("runtime.systemStatus")}</p>
+          <CardTitle>{selectedMarketBadge}</CardTitle>
+          <CardDescription>{localizedConnectionMessage}</CardDescription>
+        </div>
+        <Badge color={viewModel.systemStatus === "normal" ? "green" : viewModel.systemStatus === "fallback" ? "amber" : "red"}>
+          {systemStatusLabel}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="rail-runtime-summary">
+          <div>
+            <span>{t("marketDeck.selected")}</span>
+            <strong>{selectedMarketHeroValue}</strong>
+            <p data-positive={selectedMarket ? selectedMarket.change_percent >= 0 : undefined}>
+              {selectedMarketHeroMeta}
+            </p>
+          </div>
+          <Badge color={viewModel.realSourceRequested ? "cyan" : "amber"}>
+            {marketData.requested_source.toUpperCase()}
+          </Badge>
+        </div>
+        <div className="rail-runtime-grid rail-runtime-grid--dense">
+          <div>
+            <span>{t("hero.aiProvider")}</span>
+            <strong>{heroProviderLabel}</strong>
+            <p>{snapshot.runtime.exchange_id}</p>
+          </div>
+          <div>
+            <span>{t("runtime.marketRequested")}</span>
+            <strong>{marketData.requested_source.toUpperCase()}</strong>
+            <p>{resolveMarketSourceLabel(marketData.requested_source, t)}</p>
+          </div>
+          <div>
+            <span>{t("runtime.marketEffective")}</span>
+            <strong>{resolveMarketSourceLabel(marketData.effective_source, t)}</strong>
+            <p>{marketStatusLabel}</p>
+          </div>
+          <div>
+            <span>{t("diagnostics.warnings", { count: snapshot.runtime.warnings.length })}</span>
+            <strong>{snapshot.runtime.warnings.length}</strong>
+            <p>{marketData.detail ?? localizedConnectionMessage}</p>
+          </div>
+          <div>
+            <span>{t("analytics.signalLog.title")}</span>
+            <strong>{signalLogEvents.length}</strong>
+            <p>{t("rail.eventBuffer", { count: eventFeed.length })}</p>
+          </div>
+          <div>
+            <span>{t("diagnostics.retries")}</span>
+            <strong>{reconnectAttempts}</strong>
+            <p>{connectionMessage || actionMessage || localizedConnectionMessage}</p>
+          </div>
+          <div>
+            <span>{lastEventAt ? t("hero.lastEvent", { time: formatTime(lastEventAt) }) : t("hero.awaitingEvents")}</span>
+            <strong>{lastEventAt ? formatTime(lastEventAt) : t("hero.awaitingEvents")}</strong>
+            <p>
+              {t("rail.orderPositionSummary", {
+                orders: execution.recent_orders.length,
+                positions: execution.positions.length,
+              })}
+            </p>
+          </div>
+        </div>
+        <div className="rail-watchlist">
+          {railWatchlistItems.map((item) => {
+            const active =
+              item.symbol === selectedMarket?.symbol && item.timeframe === selectedMarket?.timeframe;
+            return (
+              <button
+                key={`${item.symbol}:${item.timeframe}`}
+                type="button"
+                className="rail-watchlist-item"
+                data-active={active}
+                onClick={() => setSelectedInstrument({ symbol: item.symbol, timeframe: item.timeframe })}
+              >
+                <div className="rail-watchlist-copy">
+                  <span>{item.symbol}</span>
+                  <small>{item.timeframe}</small>
+                </div>
+                <strong data-positive={item.change_percent >= 0}>{formatPercent(item.change_percent)}</strong>
+                <p>{formatCurrency(item.last_price)}</p>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const railDigestCard = (
+    <Card className="panel-card rail-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("hero.runtimeDigest")}</p>
+          <CardTitle>{t("hero.runtimeDigest")}</CardTitle>
+          <CardDescription>{t("hero.runtimeDigestDescription")}</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="rail-digest-list">
+          {digestCards.map(({ item, content }) => (
+            <article className="rail-digest-item" data-tone={item.tone} key={item.id}>
+              <div className="rail-digest-topline">
+                <span>{t(`digest.source.${item.source}`)}</span>
+                <strong>{content.label}</strong>
+              </div>
+              <p>{content.value}</p>
+            </article>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const workspaceContent = (() => {
+    switch (activeSection) {
+      case "market":
+        return <div className="workspace-stack">{marketDeckPanel}</div>;
+      case "thesis":
+        return <div className="workspace-stack">{thesisPanel}</div>;
+      case "strategy":
+        return <div className="workspace-stack">{extensionPanel}</div>;
+      case "analytics":
+        return <div className="workspace-stack">{analyticsPanel}</div>;
+      case "operations":
+        return (
+          <div className="workspace-section-grid two-column-grid">
+            <div className="workspace-stack workspace-column-wide">{operatorPanel}</div>
+            <div className="workspace-stack">{diagnosticsPanel}</div>
+          </div>
+        );
+      case "diagnostics":
+        return (
+          <div className="workspace-section-grid two-column-grid">
+            <div className="workspace-stack workspace-column-wide">{diagnosticsPanel}</div>
+            <div className="workspace-stack">{runtimeOverviewPanel}</div>
+          </div>
+        );
+      case "overview":
+      default:
+        return (
+          <div className="workspace-section-grid overview-grid">
+            <div className="workspace-stack workspace-column-wide">
+              {marketDeckPanel}
+              {thesisPanel}
+            </div>
+            <div className="workspace-stack">
+              {runtimeOverviewPanel}
+              {extensionPanel}
+            </div>
+          </div>
+        );
+    }
+  })();
+
+  return (
+    <main className="terminal-shell">
+      <header className="terminal-topbar">
+        <div className="terminal-brand">
+          <div className="terminal-brand-mark">
+            <img className="terminal-brand-logo" src="/branding/sfc-mark.png" alt="SFC-Quant logo" />
+          </div>
+          <div className="terminal-brand-copy">
+            <p className="eyebrow">{t("hero.phase")}</p>
+            <h1>SFC-Quant</h1>
+            <p>{t("hero.paperGuard")}</p>
+          </div>
+        </div>
+
+        <div className="terminal-topbar-focus">
+          <span className="terminal-focus-symbol">{selectedMarketBadge}</span>
+          <strong>{selectedMarketHeroValue}</strong>
+          <span data-positive={selectedMarket ? selectedMarket.change_percent >= 0 : undefined}>
+            {selectedMarketHeroMeta}
+          </span>
+        </div>
+
+        <div className="terminal-topbar-actions">
+          <div className="terminal-status-strip">
+            <div className="terminal-status-chip" data-tone={viewModel.topStates.execution === "paper" ? "success" : "danger"}>
+              <span>{t("hero.execution")}</span>
+              <strong>{viewModel.topStates.execution.toUpperCase()}</strong>
+            </div>
+            <div className="terminal-status-chip" data-tone={viewModel.topStates.system === "normal" ? "success" : viewModel.topStates.system === "fallback" ? "warning" : "danger"}>
+              <span>{t("runtime.systemStatus")}</span>
+              <strong>{systemStatusLabel}</strong>
+            </div>
+            <div className="terminal-status-chip" data-tone={viewModel.topStates.halt === "clear" ? "success" : "danger"}>
+              <span>{t("hero.halt")}</span>
               <strong>
-                {snapshot.runtime.ai_provider}
-                {snapshot.runtime.ai_model ? ` / ${snapshot.runtime.ai_model}` : ""}
+                {viewModel.topStates.halt === "clear" ? t("hero.haltClear") : t("hero.haltEngaged")}
               </strong>
             </div>
-            <div>
-              <span>Execution</span>
-              <strong>{execution.execution_mode}</strong>
-            </div>
-            <div>
-              <span>Exchange</span>
-              <strong>{snapshot.runtime.exchange_id}</strong>
-            </div>
           </div>
-        </div>
-
-        <div className="hero-sidebar">
-          <div className="status-chip" data-state={connectionTone}>
-            <span className="status-dot" />
-            <div>
-              <strong>
-                {connectionStatus === "live"
-                  ? "Live stream"
-                  : connectionStatus === "reconnecting"
-                    ? "Reconnecting"
-                    : connectionStatus === "connecting"
-                      ? "Connecting"
-                      : connectionStatus === "degraded"
-                        ? "Degraded"
-                        : "Closed"}
-              </strong>
-              <p>{connectionMessage}</p>
-            </div>
-          </div>
-
-          <div className="banner-strip">
-            <span>{actionMessage}</span>
-            <span>
-              {lastEventAt ? `Last event ${new Date(lastEventAt).toLocaleTimeString()}` : "Awaiting events"}
-            </span>
-          </div>
-
-          <div className="hero-actions">
-            <Button variant="secondary" size="sm" onClick={refreshAll} disabled={Boolean(pendingAction)}>
-              <RefreshCcw size={16} />
-              Refresh surfaces
+          <div className="terminal-locale-switcher">
+            <Button
+              variant={locale === "zh-CN" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setLocale("zh-CN")}
+            >
+              {t("language.chinese")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={reconnect}>
-              <Cable size={16} />
-              Reconnect
+            <Button
+              variant={locale === "en" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setLocale("en")}
+            >
+              {t("language.english")}
             </Button>
           </div>
         </div>
-      </motion.section>
+      </header>
 
-      <section className="dashboard-grid">
-        <div className="dashboard-main">
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
+      <div className="terminal-layout">
+        <aside className="terminal-sidebar">
+          <div className="terminal-sidebar-card">
+            <p className="section-label">{t("shell.navigation")}</p>
+            <nav className="terminal-nav" aria-label={t("shell.navigation")}>
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                const active = item.id === activeSection;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="terminal-nav-item"
+                    data-active={active}
+                    onClick={() => setActiveSection(item.id)}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <span className="terminal-nav-icon">
+                      <Icon size={18} />
+                    </span>
+                    <span className="terminal-nav-copy">
+                      <strong>{item.label}</strong>
+                      <small>{item.meta}</small>
+                    </span>
+                    <ChevronRight size={16} className="terminal-nav-arrow" />
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        <section className="terminal-main">
+          <div className="workspace-header-card">
+            <div>
+              <p className="section-label">{activeNavigationItem.meta}</p>
+              <h2>{activeNavigationItem.label}</h2>
+              <p>
+                {activeSection === "overview"
+                  ? t("shell.overviewDescription")
+                  : activeSection === "market"
+                    ? t("marketDeck.description")
+                    : activeSection === "thesis"
+                      ? t("thesis.description")
+                      : activeSection === "strategy"
+                        ? t("extensions.description")
+                        : activeSection === "analytics"
+                          ? t("analytics.description")
+                          : activeSection === "operations"
+                            ? t("operator.description")
+                            : t("diagnostics.description")}
+              </p>
+            </div>
+            <div className="workspace-header-meta">
+              <span>{t("runtime.marketRequested")}</span>
+              <strong>{marketDigestCard?.value ?? systemStatusLabel}</strong>
+            </div>
+          </div>
+
+          <motion.div
+            key={activeSection}
+            className="workspace-surface"
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.06 }}
+            transition={{ duration: 0.24 }}
           >
-            <Card className="panel-card market-deck">
-              <CardHeader className="panel-headline">
-                <div>
-                  <p className="section-label">Market Deck</p>
-                  <CardTitle>Trade surface</CardTitle>
-                  <CardDescription>
-                    Select a stream, inspect candle structure, and overlay the most recent thesis or order actions.
-                  </CardDescription>
-                </div>
-                <Badge color="cyan">{snapshot.snapshots.length} tracked feeds</Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="instrument-strip">
-                  {snapshot.snapshots.map((item: MarketSnapshot) => {
-                    const active =
-                      item.symbol === selectedMarket?.symbol &&
-                      item.timeframe === selectedMarket?.timeframe;
-                    return (
-                      <button
-                        className="instrument-pill"
-                        data-active={active}
-                        key={`${item.symbol}:${item.timeframe}`}
-                        onClick={() =>
-                          setSelectedInstrument({ symbol: item.symbol, timeframe: item.timeframe })
-                        }
-                        type="button"
-                      >
-                        <div>
-                          <strong>{item.symbol}</strong>
-                          <span>{item.timeframe}</span>
-                        </div>
-                        <small data-positive={item.change_percent >= 0}>
-                          {formatPercent(item.change_percent)}
-                        </small>
-                      </button>
-                    );
-                  })}
-                </div>
+            {workspaceContent}
+          </motion.div>
+        </section>
 
-                {selectedMarket ? (
-                  <>
-                    <div className="market-spotlight">
-                      <div>
-                        <span className="section-label">Selected Market</span>
-                        <h2>{selectedMarket.symbol}</h2>
-                      </div>
-                      <div className="spotlight-metric">
-                        <strong>{formatMoney(selectedMarket.last_price)}</strong>
-                        <span data-positive={selectedMarket.change_percent >= 0}>
-                          {formatPercent(selectedMarket.change_percent)}
-                        </span>
-                      </div>
-                      <div className="spotlight-metric compact">
-                        <span>24h volume</span>
-                        <strong>{formatCompact(selectedMarket.volume_24h)}</strong>
-                      </div>
-                    </div>
-                    <PriceChart
-                      candles={selectedMarket.candles}
-                      markers={priceMarkers}
-                      symbol={selectedMarket.symbol}
-                      timeframe={selectedMarket.timeframe}
-                    />
-                    <PnlChart
-                      candles={selectedMarket.candles}
-                      quantity={selectedPosition?.quantity ?? 0}
-                      averageEntryPrice={selectedPosition?.avg_entry_price ?? selectedMarket.last_price}
-                      realizedPnl={risk.daily_realized_pnl}
-                      offsetPnl={nonSelectedUnrealized}
-                    />
-                  </>
-                ) : (
-                  <div className="empty-state">No market streams loaded yet.</div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.section>
+        <aside className="terminal-rail">
+          <div className="terminal-rail-inner">
+            {railRuntimeCard}
+            {railDigestCard}
 
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.12 }}
-          >
-            <Card className="panel-card thesis-panel">
-              <CardHeader className="panel-headline">
-                <div>
-                  <p className="section-label">PrimoAgent</p>
-                  <CardTitle>Latest thesis</CardTitle>
-                  <CardDescription>
-                    Dedicated data, technical, news, and risk roles remain visible instead of collapsing into a black box.
-                  </CardDescription>
-                </div>
-                <Badge color={latestAnalysis?.status === "fallback" ? "amber" : "green"}>
-                  {latestAnalysis?.status ?? "pending"}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                {latestAnalysis ? (
-                  <div className="thesis-layout">
-                    <div className="thesis-summary-card">
-                      <div className="thesis-summary-header">
-                        <div>
-                          <span className="section-label">Recommendation</span>
-                          <h3>{latestAnalysis.overall_recommendation.toUpperCase()}</h3>
-                        </div>
-                        <Badge color={riskTone(riskScore) === "red" ? "red" : "cyan"}>
-                          {latestAnalysis.provider}
-                        </Badge>
-                      </div>
-                      <p>{latestAnalysis.outputs.at(-1)?.summary ?? "No summary available."}</p>
-                      <div className="thesis-role-grid">
-                        {latestAnalysis.outputs.map((role) => (
-                          <article className="thesis-role-card" key={role.role}>
-                            <div className="role-icon">
-                              {role.role === "data" ? (
-                                <Radar size={18} />
-                              ) : role.role === "technical_analysis" ? (
-                                <Gauge size={18} />
-                              ) : role.role === "news_geopolitics" ? (
-                                <Activity size={18} />
-                              ) : (
-                                <ShieldCheck size={18} />
-                              )}
-                            </div>
-                            <div>
-                              <strong>{summariseRole(role)}</strong>
-                              <p>{role.summary}</p>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="event-panel compact-panel">
-                      <div className="section-kicker">
-                        <span className="section-label">Signal tape</span>
-                        <Badge color="cyan">{eventFeed.length} frames</Badge>
-                      </div>
-                      <div className="event-feed">
-                        {eventFeed.map((event) => (
-                          <article className="event-row" key={`${event.event_id}-${event.generated_at}`}>
-                            <div className="event-head">
-                              <span className="event-type">{event.event_type}</span>
-                              <span>{new Date(event.generated_at).toLocaleTimeString()}</span>
-                            </div>
-                            <p>{describeEvent(event)}</p>
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    Run analysis for the selected instrument to populate the multi-agent thesis panel.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.18 }}
-          >
-            <Card className="panel-card extension-panel">
-              <CardHeader className="panel-headline">
-                <div>
-                  <p className="section-label">Phase 8 Extensions</p>
-                  <CardTitle>Macro evidence + strategy review</CardTitle>
-                  <CardDescription>
-                    Source-linked thesis context and optional review artifacts stay visible before
-                    anything graduates toward runtime strategy adoption.
-                  </CardDescription>
-                </div>
-                <Badge color="cyan">Phase 8</Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="extension-grid">
-                  <ThesisEvidencePanel macroRole={thesisMacroRole} />
-                  <StrategyFactoryPanel
-                    status={strategyStatus}
-                    artifacts={strategyArtifacts}
-                    pendingAction={pendingAction}
-                    onToggle={toggleStrategyFactoryAction}
-                    onGenerate={generateStrategyAction}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.24 }}
-          >
-            <Card className="panel-card analytics-panel">
-              <CardHeader className="panel-headline">
-                <div>
-                  <p className="section-label">Advanced Visual Analytics</p>
-                  <CardTitle>Signal depth layer</CardTitle>
-                  <CardDescription>
-                    Signal logs, exposure heatmap, and factor radar stay synchronized with the same realtime dashboard state.
-                  </CardDescription>
-                </div>
-                <Badge color="cyan">Phase 7</Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="analytics-grid">
-                  <SignalLog
-                    events={signalLogEvents}
-                    latestAnalysis={latestAnalysis}
-                    describeEvent={describeEvent}
-                  />
-                  <div className="analytics-side-grid">
-                    <PositionsHeatmap cells={heatmapCells} />
-                    <FactorRadar
-                      axes={factorAxes}
-                      recommendation={latestAnalysis?.overall_recommendation ?? "hold"}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.section>
-        </div>
-
-        <aside className="dashboard-sidebar">
-          <motion.section
-            className="kpi-grid"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.08 }}
-          >
-            <Card className="kpi-card">
-              <CardContent className="kpi-body">
-                <span className="section-label">Open Positions</span>
-                <strong>{execution.positions.length}</strong>
-                <p>Live paper positions currently tracked by the execution loop.</p>
-              </CardContent>
-            </Card>
-            <Card className="kpi-card">
-              <CardContent className="kpi-body">
-                <span className="section-label">Gross Exposure</span>
-                <strong>{formatMoney(totalExposure)}</strong>
-                <p>Current notional exposure across open paper positions.</p>
-              </CardContent>
-            </Card>
-            <Card className="kpi-card">
-              <CardContent className="kpi-body">
-                <span className="section-label">Unrealized P&L</span>
-                <strong data-positive={unrealizedPnl >= 0}>{formatMoney(unrealizedPnl)}</strong>
-                <p>Marked from the latest streamed market prices.</p>
-              </CardContent>
-            </Card>
-            <Card className="kpi-card risk-ring-card">
-              <CardContent className="kpi-body risk-ring-body">
-                <div>
-                  <span className="section-label">Risk Score</span>
-                  <strong>{riskLabel(riskScore)}</strong>
-                  <p>Computed from exposure, concurrency, loss pressure, warnings, and live mode.</p>
-                </div>
-                <ProgressCircle value={riskScore} size="md" color={riskTone(riskScore)}>
-                  <span className="risk-score-value">{riskScore}</span>
-                </ProgressCircle>
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.14 }}
-          >
-            <Card className="panel-card operator-panel">
-              <CardHeader className="panel-headline">
-                <div>
-                  <p className="section-label">Operator Deck</p>
-                  <CardTitle>Runtime controls</CardTitle>
-                  <CardDescription>
-                    Clear start, pause, dispatch, halt, and live-mode affordances with explicit backend-backed state.
-                  </CardDescription>
-                </div>
-                <Badge color={execution.engine_status === "running" ? "green" : "amber"}>
-                  {execution.engine_status}
-                </Badge>
-              </CardHeader>
-              <CardContent className="operator-stack">
-                <div className="operator-card-grid">
-                  <div className="operator-card">
-                    <div className="operator-title-row">
-                      <div>
-                        <span className="section-label">Execution Engine</span>
-                        <h3>{execution.engine_status === "running" ? "Active" : "Paused"}</h3>
-                      </div>
-                      {execution.engine_status === "running" ? (
-                        <Play size={18} className="operator-icon active" />
-                      ) : (
-                        <Slash size={18} className="operator-icon paused" />
-                      )}
-                    </div>
-                    <p>{execution.paused_reason ?? "Engine ready for manual dispatch."}</p>
-                    <div className="operator-actions two-up">
-                      <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
-                        <Bot size={16} />
-                        Run analysis
-                      </Button>
-                      <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
-                        <ArrowUpRight size={16} />
-                        Dispatch paper trade
-                      </Button>
-                      {execution.engine_status === "running" ? (
-                        <Button variant="danger" onClick={pauseExecutionAction} disabled={Boolean(pendingAction)}>
-                          <Slash size={16} />
-                          Pause engine
-                        </Button>
-                      ) : (
-                        <Button variant="secondary" onClick={resumeExecutionAction} disabled={Boolean(pendingAction)}>
-                          <Play size={16} />
-                          Resume engine
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="operator-card">
-                    <div className="operator-title-row">
-                      <div>
-                        <span className="section-label">Risk Guard</span>
-                        <h3>{risk.halted ? "Halt engaged" : "Guard active"}</h3>
-                      </div>
-                      {risk.halted ? (
-                        <ShieldAlert size={18} className="operator-icon risk" />
-                      ) : (
-                        <ShieldCheck size={18} className="operator-icon safe" />
-                      )}
-                    </div>
-                    <p>{risk.halt_reason ?? `Approval ${risk.policy.require_agent_approval ? "required" : "optional"}.`}</p>
-                    <div className="policy-strip">
-                      <span>Max position {formatMoney(risk.policy.max_position_notional_usd)}</span>
-                      <span>Daily loss {formatMoney(risk.policy.daily_loss_limit_usd)}</span>
-                    </div>
-                    <div className="operator-actions two-up">
-                      {risk.halted ? (
-                        <Button variant="secondary" onClick={clearRiskHaltAction} disabled={Boolean(pendingAction)}>
-                          <ShieldCheck size={16} />
-                          Clear halt
-                        </Button>
-                      ) : (
-                        <Button variant="danger" onClick={engageRiskHaltAction} disabled={Boolean(pendingAction)}>
-                          <Flame size={16} />
-                          Engage halt
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="operator-card live-card">
-                  <div className="operator-title-row">
-                    <div>
-                      <span className="section-label">Live Mode Gate</span>
-                      <h3>{risk.live_mode_enabled ? "Enabled" : "Locked"}</h3>
-                    </div>
-                    <Badge color={risk.live_mode_enabled ? "red" : "amber"}>
-                      {risk.live_mode_enabled ? "armed" : "paper-first"}
-                    </Badge>
-                  </div>
-                  <p>
-                    {risk.live_mode_reason ??
-                      "Type ENABLE LIVE TRADING to request live mode once runtime preconditions are met."}
-                  </p>
-                  <div className="live-confirm-row">
-                    <input
-                      className="live-confirm-input"
-                      onChange={(event) => setLiveConfirmationText(event.target.value)}
-                      placeholder="ENABLE LIVE TRADING"
-                      value={liveConfirmationText}
-                    />
-                    {risk.live_mode_enabled ? (
-                      <Button
-                        variant="danger"
-                        onClick={() => requestLiveModeAction(false)}
-                        disabled={Boolean(pendingAction)}
-                      >
-                        Disable
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        onClick={() => requestLiveModeAction(true, liveConfirmationText)}
-                        disabled={Boolean(pendingAction)}
-                      >
-                        Request enable
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.18 }}
-          >
-            <Card className="panel-card diagnostics-card">
-              <CardHeader className="panel-headline">
-                <div>
-                  <p className="section-label">Telemetry</p>
-                  <CardTitle>Runtime diagnostics</CardTitle>
-                  <CardDescription>
-                    The operator never loses track of warnings, reconnect loops, or current balances.
-                  </CardDescription>
-                </div>
-                <Badge color={snapshot.runtime.warnings.length > 0 ? "amber" : "green"}>
-                  {snapshot.runtime.warnings.length} warnings
-                </Badge>
-              </CardHeader>
-              <CardContent className="diagnostics-stack">
-                <div className="diagnostic-row">
-                  <div>
-                    <span className="section-label">Cash / Equity</span>
-                    <strong>
-                      {formatMoney(execution.cash_balance)} / {formatMoney(execution.equity_estimate)}
-                    </strong>
-                  </div>
-                  <ArrowDownRight size={18} className="muted-icon" />
-                </div>
-                <div className="diagnostic-row">
-                  <div>
-                    <span className="section-label">Realtime retries</span>
-                    <strong>{reconnectAttempts}</strong>
-                  </div>
-                  <Cable size={18} className="muted-icon" />
-                </div>
-                <div className="diagnostic-row">
-                  <div>
-                    <span className="section-label">Last analysis run</span>
-                    <strong>{execution.last_run_id ? execution.last_run_id.slice(0, 8) : "None yet"}</strong>
-                  </div>
-                  <Bot size={18} className="muted-icon" />
-                </div>
-
-                {snapshot.runtime.warnings.length > 0 ? (
-                  <div className="warning-list">
-                    {snapshot.runtime.warnings.map((warning) => (
-                      <div className="warning-row" key={warning}>
-                        <AlertTriangle size={16} />
-                        <span>{warning}</span>
+            <section className="kpi-grid rail-kpi-grid">
+              <Card className="kpi-card">
+                <CardContent className="kpi-body">
+                  <span className="section-label">{t("kpi.positions")}</span>
+                  <strong>{execution.positions.length}</strong>
+                  <p>{t("kpi.positionsBody")}</p>
+                </CardContent>
+              </Card>
+              <Card className="kpi-card">
+                <CardContent className="kpi-body">
+                  <span className="section-label">{t("kpi.exposure")}</span>
+                  <strong>{formatCurrency(totalExposure)}</strong>
+                  <p>{t("kpi.exposureBody")}</p>
+                </CardContent>
+              </Card>
+              <Card className="kpi-card">
+                <CardContent className="kpi-body">
+                  <span className="section-label">{t("kpi.unrealized")}</span>
+                  <strong data-positive={unrealizedPnl >= 0}>{formatCurrency(unrealizedPnl)}</strong>
+                  <p>{t("kpi.unrealizedBody")}</p>
+                </CardContent>
+              </Card>
+              <Card className="kpi-card risk-ring-card" data-tone={riskTone(riskScore)}>
+                <CardContent className="kpi-body risk-card-body">
+                  <div className="risk-gate-row">
+                    {viewModel.riskGateItems.map((gate) => (
+                      <div className="risk-gate-chip" data-active={gate.active} key={gate.id}>
+                        <span>{t(`riskGate.${gate.id}`)}</span>
+                        <strong>{t(`riskGate.${gate.value}`)}</strong>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <p className="quiet-copy">
-                    Runtime warnings are clear. Local-first telemetry is healthy and inspectable.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </motion.section>
+                  <div className="risk-ring-body">
+                    <div>
+                      <span className="section-label">{t("kpi.risk")}</span>
+                      <strong>{t(riskLabelKey(riskScore))}</strong>
+                      <p>{t("kpi.riskBody")}</p>
+                    </div>
+                    <ProgressCircle value={riskScore} size="md" color={riskTone(riskScore)}>
+                      <span className="risk-score-value">{riskScore}</span>
+                    </ProgressCircle>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+
+            {quickActionsCard}
+          </div>
         </aside>
-      </section>
+      </div>
     </main>
   );
 }

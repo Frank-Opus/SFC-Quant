@@ -14,21 +14,22 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 
 - Latest archived release: `v1.0`
 - Archive date: 2026-04-01
-- Local runtime status: backend/frontend verified locally, runbook acceptance repeated, RD-Agent real path invoked but first-run completion still needs hardening
+- Local runtime status: v1.2 release hardening is validated locally; archive/ship handoff evidence is prepared
 - Archive links:
   - `.planning/milestones/v1.0-SUMMARY.md`
   - `.planning/milestones/v1.0-ROADMAP.md`
   - `.planning/milestones/v1.0-REQUIREMENTS.md`
 
-## Current Milestone: v1.1 Bilingual UX & Live Market Readiness
+## Current Milestone: v1.2 SFC-Quant Release Hardening
 
-**Goal:** turn the v1 local demo into a more operator-ready build with runtime zh/en switching, opt-in real market data, and honest RD-Agent completion diagnostics.
+**Goal:** turn the current locally verified system into a publishable SFC-Quant release with production-facing branding, Chinese-first first-run UX, real-market default request behavior, and browser-driven release validation.
 
 **Target features:**
-- Add Chinese/English bilingual support with a visible language toggle and persistent preference
-- Add opt-in real market data mode through the existing ccxt seam while preserving `mock-safe` defaults
-- Make dashboard and diagnostics clearly show whether the system is using mock data, real exchange data, or a degraded fallback
-- Harden optional RD-Agent strategy generation so first-run progress/failure is visible and locally testable
+- Unify user-visible branding around `SFC-Quant`
+- Make first visit default to Chinese with predictable persistence rules
+- Default startup to request real market data while preserving truthful degraded/fallback behavior
+- Remove demo/milestone-era UI language without hiding runtime truth
+- Complete browser-driven release acceptance and finish archive / cleanup / ship preparation
 
 ## Requirements
 
@@ -43,15 +44,16 @@ Turn multi-agent market intelligence into explainable, risk-bounded trading acti
 - [x] Phase 7 validated richer dashboard analytics including signal logs, a positions heatmap, and a factor radar.
 - [x] Phase 8 validated source-linked macro/news thesis evidence and a review-first strategy-factory workspace.
 - [x] Phase 9 validated smoke tests, diagnostics/health surfaces, structured logs, and release-facing documentation.
+- [x] Phase 10 validated runtime zh/en switching, persistent locale preference, and locale-aware dashboard formatting.
+- [x] Phase 11 validated opt-in real-market configuration plus truthful `mock` / `ccxt` / fallback visibility in health, diagnostics, and the dashboard.
+- [x] Phase 12 validated RD-Agent progress/failure visibility, expanded verification coverage, and v1.1 demo-ready documentation.
+- [x] Phase 13 validated `SFC-Quant` branding, Chinese-first first-run behavior, and removal of demo-era UI copy.
+- [x] Phase 14 validated default real-market requests, truthful runtime/source surfaces, and explicit `paper` execution visibility.
+- [x] Phase 15 validated backend/frontend/compose release checks, browser-driven walkthrough coverage, and v1.2 ship-prep documentation.
 
 ### Active
 
-- [ ] User can switch the dashboard between Chinese and English at runtime and the preference persists locally.
-- [ ] Dashboard labels, controls, timestamps, and money/number formatting follow the selected locale without hiding risk state.
-- [ ] Operator can opt into real market data through the existing exchange/ccxt seam while `mock-safe` remains the default startup path.
-- [ ] Runtime diagnostics and UI surfaces clearly indicate whether market data is `mock`, `ccxt`, or fallback/degraded.
-- [ ] Optional RD-Agent strategy generation exposes progress/failure honestly enough for demo and local operator acceptance.
-- [ ] Release verification covers bilingual UX, real-market mode, and RD-Agent first-run behavior.
+- [ ] Select the next milestone after v1.2 archive / ship handoff is accepted.
 
 ### Out of Scope
 
@@ -116,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 for v1.1 milestone kickoff*
+*Last updated: 2026-04-01 after v1.2 release validation*

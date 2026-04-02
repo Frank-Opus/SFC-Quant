@@ -3,6 +3,15 @@ from pydantic import BaseModel
 from app.core.config import Settings
 
 
+class MarketDataRuntime(BaseModel):
+    mode: str
+    requested_source: str
+    effective_source: str
+    status: str
+    fallback_active: bool
+    detail: str | None = None
+
+
 class RuntimeSnapshot(BaseModel):
     name: str
     service: str
@@ -19,10 +28,35 @@ class RuntimeSnapshot(BaseModel):
     exchange_credentials_present: bool
     live_trading_requested: bool
     live_trading_enabled: bool
+    market_data: MarketDataRuntime
     warnings: list[str]
 
 
-def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
+def resolve_market_data_runtime(settings: Settings) -> MarketDataRuntime:
+    if settings.market_data_mode == "real":
+        return MarketDataRuntime(
+            mode="real",
+            requested_source="ccxt",
+            effective_source="unknown",
+            status="pending",
+            fallback_active=False,
+            detail="Real market mode requested; awaiting market runtime refresh.",
+        )
+    return MarketDataRuntime(
+        mode="mock",
+        requested_source="mock",
+        effective_source="mock",
+        status="mock",
+        fallback_active=False,
+        detail="Mock market data mode active.",
+    )
+
+
+def resolve_runtime(
+    settings: Settings,
+    *,
+    market_data: MarketDataRuntime | None = None,
+) -> RuntimeSnapshot:
     warnings: list[str] = []
 
     exchange_credentials_present = bool(
@@ -65,6 +99,8 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
                 f"AI provider '{settings.ai_provider}' is configured without {', '.join(missing_fields)}; backend remains in safe startup mode."
             )
 
+    resolved_market_data = market_data or resolve_market_data_runtime(settings)
+
     return RuntimeSnapshot(
         name=settings.app_name,
         service="backend",
@@ -81,5 +117,6 @@ def resolve_runtime(settings: Settings) -> RuntimeSnapshot:
         exchange_credentials_present=exchange_credentials_present,
         live_trading_requested=live_trading_requested,
         live_trading_enabled=live_trading_enabled,
+        market_data=resolved_market_data,
         warnings=warnings,
     )

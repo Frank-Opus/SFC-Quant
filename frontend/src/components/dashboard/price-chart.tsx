@@ -14,6 +14,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 
+import { useLocale } from "../../lib/i18n";
 import type { Candle } from "../../lib/market";
 
 export type PriceMarker = {
@@ -36,6 +37,7 @@ function toChartTime(value: string): UTCTimestamp {
 }
 
 export function PriceChart({ candles, markers, symbol, timeframe }: PriceChartProps) {
+  const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -163,12 +165,12 @@ export function PriceChart({ candles, markers, symbol, timeframe }: PriceChartPr
     <div className="chart-shell">
       <div className="chart-headerline">
         <div>
-          <p className="section-label">Price Surface</p>
+          <p className="section-label">{t("chart.price.kicker")}</p>
           <h3>
             {symbol} <span>{timeframe}</span>
           </h3>
         </div>
-        <p className="chart-caption">Lightweight Charts candlesticks with order and signal markers.</p>
+        <p className="chart-caption">{t("chart.price.caption")}</p>
       </div>
       <div className="chart-canvas" ref={containerRef} />
     </div>

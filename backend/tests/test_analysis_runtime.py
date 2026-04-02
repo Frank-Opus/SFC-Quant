@@ -81,6 +81,23 @@ def test_latest_analysis_route_returns_last_run(monkeypatch, tmp_path: Path) -> 
     get_settings.cache_clear()
 
 
+def test_latest_analysis_route_returns_null_when_no_run_exists(monkeypatch, tmp_path: Path) -> None:
+    configure_analysis_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        latest_response = client.get(
+            "/api/analysis/latest",
+            params={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert latest_response.status_code == 200
+    assert latest_response.json() is None
+
+    get_settings.cache_clear()
+
+
 def test_news_role_includes_source_linked_macro_evidence(monkeypatch, tmp_path: Path) -> None:
     configure_analysis_env(monkeypatch, tmp_path)
     monkeypatch.setenv("AI_PROVIDER", "mock")

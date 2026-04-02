@@ -4,6 +4,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -15,6 +16,7 @@ from app.models.strategy import (
     StrategyArtifactFile,
     StrategyFactoryConfigRequest,
     StrategyFactoryStatusResponse,
+    StrategyGenerationState,
     StrategyGenerationRequest,
     StrategyGenerationResponse,
     StrategyProvider,
@@ -39,12 +41,16 @@ class StrategyFactoryService:
         self._auto_generate = settings.strategy_factory_auto_generate
         self._rd_agent_command = settings.strategy_factory_rd_agent_command.strip()
         self._rd_agent_timeout_seconds = settings.strategy_factory_rd_agent_timeout_seconds
+        self._generation_lock = threading.Lock()
+        self._generation_state = StrategyGenerationState()
 
     async def initialize(self) -> None:
         self._workspace.mkdir(parents=True, exist_ok=True)
 
     def status(self) -> StrategyFactoryStatusResponse:
         artifacts = self.list_artifacts(limit=1)
+        with self._generation_lock:
+            generation = self._generation_state.model_copy(deep=True)
         return StrategyFactoryStatusResponse(
             enabled=self._enabled,
             configured_provider=self._configured_provider,
@@ -54,6 +60,7 @@ class StrategyFactoryService:
             reason=self._status_reason(),
             artifact_count=self._artifact_count(),
             latest_artifact=artifacts[0] if artifacts else None,
+            generation=generation,
         )
 
     async def update_config(
@@ -115,6 +122,29 @@ class StrategyFactoryService:
                 f"No latest analysis available for {payload.symbol} {payload.timeframe}. Run analysis first."
             )
 
+        self._set_generation_state(
+            status="running",
+            symbol=payload.symbol,
+            timeframe=payload.timeframe,
+            run_id=analysis.run_id,
+            started_at=datetime.now(timezone.utc),
+            detail=(
+                "Preparing RD-Agent(Q) review artifact."
+                if self._effective_provider() == "rd_agent_q"
+                else "Preparing deterministic review artifact."
+            ),
+            completed_at=None,
+            artifact_directory=None,
+            stdout_path=None,
+            stderr_path=None,
+            run_meta_path=None,
+        )
+        await self._event_bus.publish(
+            event_type="strategy.factory.started",
+            source="strategy_factory",
+            payload=self.status().model_dump(mode="json"),
+        )
+
         try:
             artifact = await asyncio.to_thread(
                 self._write_artifact,
@@ -122,6 +152,12 @@ class StrategyFactoryService:
                 notes=payload.notes,
             )
         except Exception as exc:
+            current_status = "timeout" if "timed out" in str(exc).lower() else "failed"
+            self._set_generation_state(
+                status=current_status,
+                completed_at=datetime.now(timezone.utc),
+                detail=str(exc),
+            )
             await self._event_bus.publish(
                 event_type="strategy.factory.failed",
                 source="strategy_factory",
@@ -129,10 +165,21 @@ class StrategyFactoryService:
                     "symbol": payload.symbol,
                     "timeframe": payload.timeframe,
                     "reason": str(exc),
+                    "status": self.status().model_dump(mode="json"),
                 },
             )
             raise
 
+        self._set_generation_state(
+            status="completed",
+            completed_at=datetime.now(timezone.utc),
+            artifact_directory=artifact.directory,
+            detail=(
+                "RD-Agent(Q) review artifact completed."
+                if artifact.effective_provider == "rd_agent_q"
+                else "Deterministic review artifact completed."
+            ),
+        )
         await self._event_bus.publish(
             event_type="strategy.factory.generated",
             source="strategy_factory",
@@ -148,6 +195,42 @@ class StrategyFactoryService:
 
     def _artifact_count(self) -> int:
         return sum(1 for _ in self._workspace.glob("**/strategy.json"))
+
+    def _set_generation_state(
+        self,
+        *,
+        status: str,
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        run_id: str | None = None,
+        artifact_directory: str | None = None,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
+        detail: str | None = None,
+        stdout_path: str | None = None,
+        stderr_path: str | None = None,
+        run_meta_path: str | None = None,
+    ) -> None:
+        with self._generation_lock:
+            current = self._generation_state
+            self._generation_state = StrategyGenerationState(
+                status=status,  # type: ignore[arg-type]
+                symbol=symbol if symbol is not None else current.symbol,
+                timeframe=timeframe if timeframe is not None else current.timeframe,
+                run_id=run_id if run_id is not None else current.run_id,
+                artifact_directory=(
+                    artifact_directory
+                    if artifact_directory is not None
+                    else current.artifact_directory
+                ),
+                started_at=started_at if started_at is not None else current.started_at,
+                updated_at=datetime.now(timezone.utc),
+                completed_at=completed_at if completed_at is not None else current.completed_at,
+                detail=detail if detail is not None else current.detail,
+                stdout_path=stdout_path if stdout_path is not None else current.stdout_path,
+                stderr_path=stderr_path if stderr_path is not None else current.stderr_path,
+                run_meta_path=run_meta_path if run_meta_path is not None else current.run_meta_path,
+            )
 
     def _effective_provider(self) -> StrategyProvider:
         if self._configured_provider == "mock_rdq":
@@ -193,6 +276,11 @@ class StrategyFactoryService:
         )
         artifact_dir = self._workspace / directory_name
         artifact_dir.mkdir(parents=True, exist_ok=False)
+        self._set_generation_state(
+            status="running",
+            artifact_directory=str(artifact_dir),
+            detail="Writing review artifact files.",
+        )
 
         risk_output = analysis.outputs[-1] if analysis.outputs else None
         macro_output = next(
@@ -370,6 +458,14 @@ class StrategyFactoryService:
         stderr_path = artifact_dir / "rdagent.stderr.log"
         run_meta_path = artifact_dir / "rdagent.run.json"
         input_path = artifact_dir / "rdagent.input.json"
+        self._set_generation_state(
+            status="running",
+            artifact_directory=str(artifact_dir),
+            detail="Running RD-Agent(Q) command.",
+            stdout_path=str(stdout_path),
+            stderr_path=str(stderr_path),
+            run_meta_path=str(run_meta_path),
+        )
 
         input_payload = {
             "symbol": analysis.symbol,
@@ -422,6 +518,16 @@ class StrategyFactoryService:
                     indent=2,
                 )
             )
+            self._set_generation_state(
+                status="timeout",
+                completed_at=datetime.now(timezone.utc),
+                detail=(
+                    f"RD-Agent(Q) command timed out after {self._rd_agent_timeout_seconds} seconds."
+                ),
+                stdout_path=str(stdout_path),
+                stderr_path=str(stderr_path),
+                run_meta_path=str(run_meta_path),
+            )
             raise RuntimeError(
                 f"RD-Agent(Q) command timed out after {self._rd_agent_timeout_seconds} seconds."
             ) from exc
@@ -437,6 +543,18 @@ class StrategyFactoryService:
                 },
                 indent=2,
             )
+        )
+        self._set_generation_state(
+            status="completed" if result.returncode == 0 else "failed",
+            completed_at=datetime.now(timezone.utc),
+            detail=(
+                "RD-Agent(Q) command completed successfully."
+                if result.returncode == 0
+                else f"RD-Agent(Q) command failed with exit code {result.returncode}."
+            ),
+            stdout_path=str(stdout_path),
+            stderr_path=str(stderr_path),
+            run_meta_path=str(run_meta_path),
         )
 
         if result.returncode != 0:

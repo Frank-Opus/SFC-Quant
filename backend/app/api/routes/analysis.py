@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from app.models.analysis import AnalysisRunRequest, AnalysisRunResult
 
@@ -10,19 +10,14 @@ async def run_analysis(request: Request, payload: AnalysisRunRequest) -> Analysi
     return await request.app.state.analysis_service.run_analysis(payload, trigger="manual")
 
 
-@router.get("/latest", response_model=AnalysisRunResult)
+@router.get("/latest", response_model=AnalysisRunResult | None)
 async def get_latest_analysis(
     request: Request,
     symbol: str,
     timeframe: str = "1m",
-) -> AnalysisRunResult:
+) -> AnalysisRunResult | None:
     result = request.app.state.analysis_service.latest_analysis(
         symbol=symbol,
         timeframe=timeframe,
     )
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No analysis available for {symbol} {timeframe}",
-        )
     return result

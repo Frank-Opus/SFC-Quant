@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.core.runtime import RuntimeSnapshot
+from app.core.runtime import MarketDataRuntime, RuntimeSnapshot
 from app.models.market import MarketSnapshot
 
 EventType = Literal[
@@ -31,6 +31,7 @@ EventType = Literal[
     "risk.live_mode.enabled",
     "risk.live_mode.disabled",
     "strategy.factory.config.updated",
+    "strategy.factory.started",
     "strategy.factory.generated",
     "strategy.factory.failed",
 ]
@@ -47,5 +48,6 @@ class EventEnvelope(BaseModel):
 class MarketSnapshotResponse(BaseModel):
     generated_at: datetime
     runtime: RuntimeSnapshot
+    market_data: MarketDataRuntime
     snapshots: list[MarketSnapshot] = Field(default_factory=list)
     recent_events: list[EventEnvelope] = Field(default_factory=list)
