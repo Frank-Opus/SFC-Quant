@@ -1,0 +1,136 @@
+<div class="section">
+  <div class="label">SFC-Quant UI Direction</div>
+  <h2>整站下一轮打磨，主气质更该往哪边收敛？</h2>
+  <p class="subtitle">
+    这不是选单个页面，而是在给整个终端定统一语言。请选一个最像我们接下来要做的方向。
+  </p>
+</div>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A · Institutional Command Deck</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Runtime Truth | Market Route | Risk Gate | Paper Execution</div>
+          <div style="display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:12px;">
+            <div class="mock-content" style="min-height:180px;">Hero control strip + key market / workflow / risk blocks</div>
+            <div class="mock-sidebar" style="min-height:180px;">Operator checklist + alerts + next actions</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;">
+            <div class="placeholder">Analytics</div>
+            <div class="placeholder">Execution / PnL</div>
+            <div class="placeholder">Diagnostics</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>机构指挥台</h3>
+      <p>首屏先给“态势 + 风险 + 操作”，强调可信、克制、像真正的交易终端首页。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>第一印象最专业</li>
+            <li>最适合统一全部模块</li>
+            <li>最能突出真实运行态</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>代价</h4>
+          <ul>
+            <li>视觉会更克制</li>
+            <li>需要我们重排层级而不是只加特效</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B · Editorial Intelligence Terminal</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Macro Context | Thesis Feed | Agent Opinions | Market Snapshot</div>
+          <div style="display:grid;grid-template-columns:.9fr 1.1fr;gap:12px;margin-top:12px;">
+            <div class="mock-sidebar" style="min-height:220px;">Narrative timeline / intelligence brief</div>
+            <div class="mock-content" style="min-height:220px;">Thesis workspace + evidence + workflow map</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px;">
+            <div class="placeholder">Research Metrics</div>
+            <div class="placeholder">Action Queue</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>情报研究终端</h3>
+      <p>更强调多智能体洞察、叙事、证据链和研究流，像 AI 研究台而不是纯交易台。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>最能体现 PrimoAgent 特色</li>
+            <li>叙事和证据表达空间更大</li>
+            <li>适合工作流中枢继续深化</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>代价</h4>
+          <ul>
+            <li>交易执行感会弱一些</li>
+            <li>容易显得“信息很多但不够能下单”</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C · Dense Ops Grid</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Modules | Feeds | Runtime | Jobs | Logs | Alerts</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;">
+            <div class="placeholder" style="min-height:120px;">Overview</div>
+            <div class="placeholder" style="min-height:120px;">Workflow</div>
+            <div class="placeholder" style="min-height:120px;">Analytics</div>
+            <div class="placeholder" style="min-height:120px;">Diagnostics</div>
+            <div class="placeholder" style="min-height:120px;">Risk</div>
+            <div class="placeholder" style="min-height:120px;">Signals</div>
+            <div class="placeholder" style="min-height:120px;">Performance</div>
+            <div class="placeholder" style="min-height:120px;">Execution</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>高密度运维面板</h3>
+      <p>让整个界面像专业 NOC / OMS，信息密度最高，适合重状态、重监控、重细节。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>最“硬核”</li>
+            <li>信息密度最大</li>
+            <li>适合 diagnostics / operations</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>代价</h4>
+          <ul>
+            <li>容易压垮首屏节奏</li>
+            <li>如果处理不好会重新变成“卡片堆”</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="subtitle">推荐基调：<strong>A</strong>。因为它最能把“真实运行态 + 风控 + 交易终端质感”统一起来，同时还能吸收 B 的研究表达和 C 的运维密度。</p>
+</div>
