@@ -9,13 +9,21 @@ from app.models.market import Candle, MarketSnapshot
 from app.services.market import CcxtMarketDataAdapter
 
 
-def configure_market_env(monkeypatch, tmp_path: Path, *, market_data_mode: str = "mock") -> None:
+def configure_market_env(
+    monkeypatch,
+    tmp_path: Path,
+    *,
+    market_data_mode: str | None = "mock",
+) -> None:
     monkeypatch.setenv("APP_MODE", "mock")
     monkeypatch.setenv("AI_PROVIDER", "mock")
     monkeypatch.delenv("AI_API_KEY", raising=False)
     monkeypatch.delenv("AI_BASE_URL", raising=False)
     monkeypatch.delenv("AI_MODEL", raising=False)
-    monkeypatch.setenv("MARKET_DATA_MODE", market_data_mode)
+    if market_data_mode is None:
+        monkeypatch.delenv("MARKET_DATA_MODE", raising=False)
+    else:
+        monkeypatch.setenv("MARKET_DATA_MODE", market_data_mode)
     monkeypatch.setenv("MARKET_SYMBOLS", "BTC/USDT")
     monkeypatch.setenv("MARKET_TIMEFRAMES", "1m")
     monkeypatch.setenv("MARKET_HISTORY_LIMIT", "4")
@@ -50,8 +58,39 @@ def _build_real_snapshot() -> MarketSnapshot:
     )
 
 
-def test_market_snapshot_route_returns_normalized_data(monkeypatch, tmp_path: Path) -> None:
-    configure_market_env(monkeypatch, tmp_path)
+def test_market_snapshot_route_defaults_to_real_mode_and_reports_degraded_when_exchange_unavailable(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_market_env(monkeypatch, tmp_path, market_data_mode=None)
+
+    async def _raise_fetch(*args, **kwargs):
+        raise RuntimeError("ccxt offline in test")
+
+    monkeypatch.setattr(CcxtMarketDataAdapter, "fetch_market_snapshot", _raise_fetch)
+
+    with TestClient(app) as client:
+        response = client.get("/api/market/snapshot")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["runtime"]["market_data"]["mode"] == "real"
+    assert payload["runtime"]["market_data"]["requested_source"] == "ccxt"
+    assert payload["runtime"]["market_data"]["effective_source"] == "unavailable"
+    assert payload["runtime"]["market_data"]["status"] == "degraded"
+    assert payload["runtime"]["market_data"]["fallback_active"] is False
+    assert payload["market_data"]["status"] == "degraded"
+    assert payload["market_data"]["effective_source"] == "unavailable"
+    assert payload["snapshots"] == []
+    assert "no mock fallback in real mode" in payload["runtime"]["market_data"]["detail"].lower()
+
+    get_settings.cache_clear()
+
+
+def test_market_snapshot_route_explicit_mock_mode_still_returns_mock_data(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_market_env(monkeypatch, tmp_path, market_data_mode="mock")
 
     with TestClient(app) as client:
         response = client.get("/api/market/snapshot")
@@ -60,9 +99,11 @@ def test_market_snapshot_route_returns_normalized_data(monkeypatch, tmp_path: Pa
     payload = response.json()
     assert payload["runtime"]["runtime_mode"] == "mock-safe"
     assert payload["runtime"]["market_data"]["mode"] == "mock"
+    assert payload["runtime"]["market_data"]["requested_source"] == "mock"
+    assert payload["runtime"]["market_data"]["effective_source"] == "mock"
     assert payload["runtime"]["market_data"]["status"] == "mock"
-    assert payload["market_data"]["requested_source"] == "mock"
-    assert payload["market_data"]["effective_source"] == "mock"
+    assert payload["runtime"]["market_data"]["fallback_active"] is False
+    assert payload["market_data"]["status"] == "mock"
     assert len(payload["snapshots"]) == 1
     snapshot = payload["snapshots"][0]
     assert snapshot["symbol"] == "BTC/USDT"

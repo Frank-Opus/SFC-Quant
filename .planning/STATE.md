@@ -35,8 +35,9 @@ Progress: [██████████] 100%
 
 **Decisions:** See `.planning/PROJECT.md` and `docs/plans/2026-04-01-v1-2-release-design.md`
 
-**Pending Todos:** 1 pending todo — see `.planning/todos/pending/`
+**Pending Todos:** 2 pending todos — see `.planning/todos/pending/`
 - `2026-04-01-add-bilingual-ui-and-real-market-integration.md` — materially satisfied by v1.2; keep only if a future milestone wants to extend beyond the current shipped scope
+- `2026-04-02-plan-real-market-and-live-execution-integration.md` — active gap-closure track for moving from mock/dev runtime to real-market, true execution, and release-grade deployment
 
 ## Blockers/Concerns
 

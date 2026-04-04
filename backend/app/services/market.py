@@ -1,5 +1,6 @@
 import asyncio
 import math
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
@@ -384,6 +385,13 @@ class MarketRuntimeService:
 
 def _fetch_ohlcv_records(exchange_class, symbol: str, timeframe: str, history_limit: int):
     exchange = exchange_class({"enableRateLimit": True})
+    proxy = (
+        os.environ.get("HTTPS_PROXY")
+        or os.environ.get("HTTP_PROXY")
+        or os.environ.get("ALL_PROXY")
+    )
+    if proxy:
+        exchange.proxies = {"http": proxy, "https": proxy}
     try:
         return exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=history_limit)
     finally:

@@ -7,7 +7,7 @@ from app.main import app
 from app.services.market import CcxtMarketDataAdapter
 
 
-def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
+def test_health_reports_mock_safe_when_requested(monkeypatch) -> None:
     for key in (
         "APP_MODE",
         "LIVE_TRADING_ENABLED",
@@ -20,6 +20,7 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
     ):
         monkeypatch.delenv(key, raising=False)
 
+    monkeypatch.setenv("MARKET_DATA_MODE", "mock")
     get_settings.cache_clear()
 
     with TestClient(app) as client:
@@ -57,7 +58,7 @@ def test_health_reports_mock_safe_defaults(monkeypatch) -> None:
     get_settings.cache_clear()
 
 
-def test_health_reports_real_mode_startup_truth_when_exchange_unavailable(
+def test_health_reports_default_real_mode_startup_truth_when_exchange_unavailable(
     monkeypatch, tmp_path: Path
 ) -> None:
     for key in (
@@ -72,7 +73,6 @@ def test_health_reports_real_mode_startup_truth_when_exchange_unavailable(
     ):
         monkeypatch.delenv(key, raising=False)
 
-    monkeypatch.setenv("MARKET_DATA_MODE", "real")
     monkeypatch.setenv("MARKET_STREAM_ENABLED", "false")
     monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path / "events"))
 

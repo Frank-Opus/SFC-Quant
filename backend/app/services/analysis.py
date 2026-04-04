@@ -19,10 +19,13 @@ from app.models.analysis import (
     ProviderAnalysisDraft,
     SourceReference,
 )
+from app.models.intelligence import IntelligenceSnapshotResponse
 from app.models.market import MarketSnapshot
 from app.services.event_bus import EventBus
+from app.services.intelligence import ExternalIntelligenceService
 from app.services.market import MarketRuntimeService
 from app.services.providers import MockAIProvider, ProviderFactory
+from app.services.run_ledger import RunLedgerService
 
 ROLE_SEQUENCE: tuple[AgentRole, ...] = (
     "data",
@@ -40,12 +43,20 @@ class AnalysisService:
         market_service: MarketRuntimeService,
         event_bus: EventBus,
         provider_factory: ProviderFactory,
+        run_ledger: RunLedgerService,
+        intelligence_service: ExternalIntelligenceService,
     ) -> None:
         self._settings = settings
         self._market_service = market_service
         self._event_bus = event_bus
         self._provider_factory = provider_factory
+        self._run_ledger = run_ledger
+        self._intelligence_service = intelligence_service
         self._latest_runs: dict[str, AnalysisRunResult] = {}
+
+    @property
+    def intelligence_service(self) -> ExternalIntelligenceService:
+        return self._intelligence_service
 
     async def initialize(self) -> None:
         for event in reversed(self._event_bus.get_recent_events(limit=200)):
@@ -67,6 +78,10 @@ class AnalysisService:
             symbol=request.symbol,
             timeframe=request.timeframe,
         )
+        external_intelligence = await self._intelligence_service.snapshot(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+        )
         started_at = datetime.now(timezone.utc)
         run_id = str(uuid4())
         await self._event_bus.publish(
@@ -78,6 +93,20 @@ class AnalysisService:
                 "timeframe": request.timeframe,
                 "trigger": trigger,
                 "requested_at": started_at.isoformat(),
+            },
+        )
+        self._run_ledger.append_stage(
+            run_id=run_id,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            stage="analysis",
+            status="running",
+            detail="PrimoAgent analysis requested and waiting for role outputs.",
+            actor=self._settings.ai_provider,
+            generated_at=started_at,
+            metadata={
+                "trigger": trigger,
+                "external_intelligence_status": external_intelligence.status,
             },
         )
 
@@ -97,10 +126,12 @@ class AnalysisService:
         for role in ROLE_SEQUENCE:
             output = await self._run_role(
                 role=role,
+                run_id=run_id,
                 request=request,
                 market_snapshot=market_snapshot,
                 prior_outputs=outputs,
                 configured_provider=selection.provider,
+                external_intelligence=external_intelligence,
             )
             outputs.append(output)
             used_fallback = used_fallback or output.status == "fallback"
@@ -122,6 +153,22 @@ class AnalysisService:
             overall_recommendation=overall_recommendation,
         )
         self._latest_runs[self._key(request.symbol, request.timeframe)] = run
+        self._run_ledger.append_stage(
+            run_id=run_id,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            stage="analysis",
+            status="degraded" if used_fallback else "completed",
+            detail=(
+                f"PrimoAgent completed with {overall_recommendation.upper()} recommendation."
+            ),
+            actor=run.model,
+            generated_at=completed_at,
+            metadata={
+                "provider": run.provider,
+                "external_intelligence_status": external_intelligence.status,
+            },
+        )
         await self._event_bus.publish(
             event_type="agent.analysis.completed",
             source="primoagent",
@@ -136,10 +183,12 @@ class AnalysisService:
         self,
         *,
         role: AgentRole,
+        run_id: str,
         request: AnalysisRunRequest,
         market_snapshot: MarketSnapshot,
         prior_outputs: list[AgentAnalysisResult],
         configured_provider,
+        external_intelligence: IntelligenceSnapshotResponse,
     ) -> AgentAnalysisResult:
         system_prompt = self._build_system_prompt(role)
         user_prompt = self._build_user_prompt(
@@ -147,6 +196,7 @@ class AnalysisService:
             request=request,
             market_snapshot=market_snapshot,
             prior_outputs=prior_outputs,
+            external_intelligence=external_intelligence,
         )
 
         started = time.perf_counter()
@@ -158,6 +208,7 @@ class AnalysisService:
                     role=role,
                     market_snapshot=market_snapshot,
                     prior_outputs=prior_outputs,
+                    external_intelligence=external_intelligence,
                 )
             else:
                 draft = await provider.generate(
@@ -181,6 +232,7 @@ class AnalysisService:
                 role=role,
                 market_snapshot=market_snapshot,
                 prior_outputs=prior_outputs,
+                external_intelligence=external_intelligence,
             )
 
         latency_ms = int((time.perf_counter() - started) * 1000)
@@ -201,6 +253,21 @@ class AnalysisService:
                 "timeframe": request.timeframe,
                 "run_role": role,
                 "output": result.model_dump(mode="json"),
+            },
+        )
+        self._run_ledger.append_stage(
+            run_id=run_id,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            stage="analysis",
+            status="degraded" if status == "fallback" else "running",
+            detail=f"{role} lane completed: {result.summary}",
+            actor=result.provider,
+            generated_at=result.generated_at,
+            metadata={
+                "role": role,
+                "recommendation": result.recommendation,
+                "external_intelligence_status": external_intelligence.status,
             },
         )
         return result
@@ -224,6 +291,7 @@ class AnalysisService:
         request: AnalysisRunRequest,
         market_snapshot: MarketSnapshot,
         prior_outputs: Iterable[AgentAnalysisResult],
+        external_intelligence: IntelligenceSnapshotResponse,
     ) -> str:
         lines = [
             f"symbol: {request.symbol}",
@@ -251,6 +319,7 @@ class AnalysisService:
             "risk_decision": "Synthesize the earlier roles into a cautious trading recommendation.",
         }
         lines.append(f"role_guidance: {role_guidance[role]}")
+        lines.append(self._intelligence_service.prompt_context(external_intelligence))
         return "\n".join(lines)
 
     def _mock_output(
@@ -259,6 +328,7 @@ class AnalysisService:
         role: AgentRole,
         market_snapshot: MarketSnapshot,
         prior_outputs: list[AgentAnalysisResult],
+        external_intelligence: IntelligenceSnapshotResponse,
     ) -> ProviderAnalysisDraft:
         change = market_snapshot.change_percent
         abs_change = abs(change)
@@ -351,7 +421,10 @@ class AnalysisService:
             )
 
         if role == "news_geopolitics":
-            macro_thesis = _build_mock_macro_thesis(market_snapshot)
+            macro_thesis = _build_mock_macro_thesis(
+                market_snapshot,
+                external_intelligence=external_intelligence,
+            )
             caution_bias = macro_thesis.stance
             return ProviderAnalysisDraft(
                 signal_bias=caution_bias,
@@ -359,58 +432,15 @@ class AnalysisService:
                 confidence=0.58 if caution_bias != "cautious" else 0.49,
                 summary=macro_thesis.summary,
                 rationale=[
-                    "Phase 8 now exposes reviewable macro context even when the runtime is still operating in local mock mode.",
-                    "Reference links point operators to canonical macro/news desks, but the platform is explicit that they are not live-ingested headlines.",
-                    "Macro conviction is deliberately capped until a real external ingestion pipeline lands in a later phase.",
+                    "Macro/news posture uses live external reference services when they are configured and reachable.",
+                    "The system still treats these feeds as operator-auditable context instead of an unchecked auto-trading trigger.",
+                    "When any provider is unavailable, the macro lane preserves uncertainty instead of inventing confidence.",
                 ],
-                evidence=[
-                    EvidencePoint(
-                        label="Liquidity sensitivity",
-                        detail=(
-                            f"{market_snapshot.symbol} moved {change}% over the sampled window, so macro beta remains relevant to intraday positioning."
-                        ),
-                        kind="macro",
-                    ),
-                    EvidencePoint(
-                        label="Volatility posture",
-                        detail=(
-                            "Expanded short-window volatility shifts the thesis toward patience and tighter risk framing."
-                            if abs_change > 2
-                            else "Volatility remains moderate enough for a watchful rather than defensive macro posture."
-                        ),
-                        kind="risk",
-                    ),
-                    EvidencePoint(
-                        label="Coverage mode",
-                        detail="Source links are reference anchors plus local synthesis; no live headline ingestion is active yet.",
-                        kind="news",
-                    ),
-                ],
-                sources=[
-                    SourceReference(
-                        title="Federal Reserve - Monetary Policy",
-                        kind="macro",
-                        url="https://www.federalreserve.gov/monetarypolicy.htm",
-                        note="Reference anchor only in mock mode.",
-                    ),
-                    SourceReference(
-                        title="FRED Macro Data",
-                        kind="macro",
-                        url="https://fred.stlouisfed.org/",
-                        note="Operator review source for rates/liquidity context.",
-                    ),
-                    SourceReference(
-                        title="Reuters Markets",
-                        kind="news",
-                        url="https://www.reuters.com/markets/",
-                        note="Reference news desk; not directly ingested by the backend.",
-                    ),
-                    SourceReference(
-                        title="Local thesis synthesis",
-                        kind="internal",
-                        note="Derived from current market snapshot plus prior PrimoAgent role outputs.",
-                    ),
-                ],
+                evidence=_build_external_evidence(
+                    market_snapshot,
+                    external_intelligence=external_intelligence,
+                ),
+                sources=_build_external_sources(external_intelligence),
                 macro_thesis=macro_thesis,
             )
 
@@ -457,60 +487,130 @@ class AnalysisService:
         return f"{symbol}:{timeframe}"
 
 
-def _build_mock_macro_thesis(market_snapshot: MarketSnapshot) -> MacroThesis:
+def _build_mock_macro_thesis(
+    market_snapshot: MarketSnapshot,
+    *,
+    external_intelligence: IntelligenceSnapshotResponse,
+) -> MacroThesis:
     change = market_snapshot.change_percent
     abs_change = abs(change)
-    stance = "bullish" if change >= 1.5 else "bearish" if change <= -1.5 else "cautious" if abs_change > 2 else "neutral"
+    focus_metric = external_intelligence.crypto[0] if external_intelligence.crypto else None
+    rate_10y = next((metric for metric in external_intelligence.macro if metric.key == "DGS10"), None)
+    fed_funds = next((metric for metric in external_intelligence.macro if metric.key == "FEDFUNDS"), None)
+    wti = external_intelligence.energy[0] if external_intelligence.energy else None
+    headline = external_intelligence.headlines[0] if external_intelligence.headlines else None
+
+    stance_score = 0
+    if focus_metric and focus_metric.change_percent is not None:
+        if focus_metric.change_percent >= 1:
+            stance_score += 1
+        elif focus_metric.change_percent <= -1:
+            stance_score -= 1
+    if rate_10y is not None:
+        if rate_10y.value >= 4.5:
+            stance_score -= 1
+        elif rate_10y.value <= 4.0:
+            stance_score += 1
+    if wti is not None:
+        if wti.value >= 100:
+            stance_score -= 1
+        elif wti.value <= 85:
+            stance_score += 1
+
+    if stance_score >= 2:
+        stance = "bullish"
+    elif stance_score <= -2:
+        stance = "bearish"
+    elif abs_change > 2 or stance_score == -1:
+        stance = "cautious"
+    else:
+        stance = "neutral"
+
     regime = (
-        "risk-on but headline-sensitive"
-        if change >= 1.0
-        else "fragile risk appetite"
-        if change <= -1.0
-        else "balanced macro tape"
-    )
-    summary = (
-        "Macro context is constructive but still headline-sensitive; reference macro sources support a watchful risk-on stance."
+        "risk-on with macro support"
         if stance == "bullish"
-        else "Macro context leans defensive; volatility and policy uncertainty argue for patience before fresh risk is added."
+        else "defensive macro tape"
         if stance in {"bearish", "cautious"}
-        else "Macro context is balanced, so thesis conviction depends more on market structure than on a decisive cross-asset catalyst."
+        else "balanced cross-asset tape"
     )
+
+    focus_text = (
+        f"{focus_metric.label} is {focus_metric.value:.2f} USD with {focus_metric.change_percent:+.2f}% 24h change."
+        if focus_metric and focus_metric.change_percent is not None
+        else f"{market_snapshot.symbol} moved {change}% on the sampled window."
+    )
+    rate_text = (
+        f"US 10Y sits near {rate_10y.value:.2f}% and Fed Funds is {fed_funds.value:.2f}%"
+        if rate_10y and fed_funds
+        else "Rates context remains incomplete"
+    )
+    energy_text = (
+        f"WTI crude is trading near {wti.value:.2f} {wti.unit or ''}."
+        if wti is not None
+        else "Energy pricing context is unavailable."
+    )
+    headline_text = headline.title if headline else "No live crypto headline is currently available."
+
+    summary = (
+        f"{focus_text} {rate_text}; {energy_text} Latest headline: {headline_text}"
+    )
+
     catalysts = [
         MacroCatalyst(
+            label="Crypto reference tape",
+            detail=focus_text,
+            impact="bullish" if stance == "bullish" else "bearish" if stance == "bearish" else "neutral",
+            horizon="intraday",
+        ),
+        MacroCatalyst(
             label="Rates and liquidity backdrop",
-            detail="Policy path and liquidity conditions remain the main macro throttle for crypto beta.",
-            impact="cautious" if abs_change > 2 else "neutral",
+            detail=rate_text,
+            impact="cautious" if rate_10y and rate_10y.value >= 4.5 else "neutral",
             horizon="macro",
         ),
         MacroCatalyst(
-            label="Cross-asset risk appetite",
-            detail=(
-                "Recent upside suggests traders are willing to pay for beta again."
-                if change > 0
-                else "Recent downside suggests fast-money appetite is fading."
-            ),
-            impact="bullish" if change > 0.6 else "bearish" if change < -0.6 else "neutral",
+            label="Energy inflation pressure",
+            detail=energy_text,
+            impact="cautious" if wti and wti.value >= 100 else "neutral",
             horizon="swing",
         ),
-        MacroCatalyst(
-            label="Crypto-specific news sensitivity",
-            detail="Until direct ingestion exists, operators should cross-check any ETF, regulation, or exchange headlines manually.",
-            impact="cautious",
-            horizon="intraday",
-        ),
     ]
+    if headline is not None:
+        catalysts.append(
+            MacroCatalyst(
+                label="Headline pressure",
+                detail=headline.title,
+                impact="cautious",
+                horizon="intraday",
+            )
+        )
+
     watch_items = [
         MacroWatchItem(
-            label="Policy repricing",
-            trigger="A sharp rates narrative shift or surprise central-bank guidance.",
-            implication="Would tighten risk appetite and lower conviction for immediate adds.",
+            label="Rates repricing",
+            trigger=(
+                f"Watch US 10Y above 4.50% (current {rate_10y.value:.2f}%)."
+                if rate_10y is not None
+                else "Watch the next Treasury yield repricing."
+            ),
+            implication="Would tighten risk appetite and reduce crypto beta conviction.",
         ),
         MacroWatchItem(
-            label="Market breadth confirmation",
-            trigger="Broad upside participation across tracked pairs instead of a single-symbol move.",
-            implication="Would improve confidence that the thesis is not just isolated noise.",
+            label="Energy shock",
+            trigger=(
+                f"Watch WTI above 100 {wti.unit or ''} (current {wti.value:.2f})."
+                if wti is not None
+                else "Watch for a new oil spike."
+            ),
+            implication="Would revive inflation pressure and harden macro risk-off behavior.",
+        ),
+        MacroWatchItem(
+            label="Headline follow-through",
+            trigger=headline_text,
+            implication="Use the live headline tape as a confirmation layer before escalating size.",
         ),
     ]
+
     return MacroThesis(
         regime=regime,
         stance=stance,
@@ -518,6 +618,128 @@ def _build_mock_macro_thesis(market_snapshot: MarketSnapshot) -> MacroThesis:
         catalysts=catalysts,
         watch_items=watch_items,
     )
+
+
+def _build_external_evidence(
+    market_snapshot: MarketSnapshot,
+    *,
+    external_intelligence: IntelligenceSnapshotResponse,
+) -> list[EvidencePoint]:
+    evidence = [
+        EvidencePoint(
+            label="Market sensitivity",
+            detail=(
+                f"{market_snapshot.symbol} moved {market_snapshot.change_percent}% over the sampled window, so macro beta remains relevant to tactical positioning."
+            ),
+            kind="macro",
+        )
+    ]
+    for metric in external_intelligence.macro[:2]:
+        evidence.append(
+            EvidencePoint(
+                label=metric.label,
+                detail=(
+                    f"{metric.value:.2f}{(' ' + metric.unit) if metric.unit else ''} as of {metric.as_of.date().isoformat() if metric.as_of else 'latest'}"
+                ),
+                kind="macro",
+            )
+        )
+    if external_intelligence.energy:
+        metric = external_intelligence.energy[0]
+        evidence.append(
+            EvidencePoint(
+                label=metric.label,
+                detail=f"{metric.value:.2f}{(' ' + metric.unit) if metric.unit else ''}",
+                kind="risk",
+            )
+        )
+    if external_intelligence.headlines:
+        evidence.append(
+            EvidencePoint(
+                label="Live headline",
+                detail=external_intelligence.headlines[0].title,
+                kind="news",
+            )
+        )
+    if external_intelligence.warnings:
+        evidence.append(
+            EvidencePoint(
+                label="Coverage gaps",
+                detail=" | ".join(external_intelligence.warnings[:2]),
+                kind="risk",
+            )
+        )
+    return evidence
+
+
+def _build_external_sources(
+    external_intelligence: IntelligenceSnapshotResponse,
+) -> list[SourceReference]:
+    sources: list[SourceReference] = []
+    if external_intelligence.crypto:
+        sources.append(
+            SourceReference(
+                title="CoinGecko Crypto Tape",
+                kind="macro",
+                url="https://www.coingecko.com/",
+                note="Live crypto reference pricing used for macro/news context.",
+            )
+        )
+    if external_intelligence.macro:
+        sources.append(
+            SourceReference(
+                title="FRED Macro Data",
+                kind="macro",
+                url="https://fred.stlouisfed.org/",
+                note="Live rates and dollar context from FRED.",
+            )
+        )
+    if external_intelligence.energy:
+        sources.append(
+            SourceReference(
+                title="EIA Energy Data",
+                kind="macro",
+                url="https://www.eia.gov/opendata/",
+                note="Live WTI pricing used as inflation/energy pressure context.",
+            )
+        )
+    if external_intelligence.headlines:
+        sources.append(
+            SourceReference(
+                title=external_intelligence.headlines[0].source,
+                kind="news",
+                url=external_intelligence.headlines[0].url,
+                note=external_intelligence.headlines[0].title,
+            )
+        )
+    if not any(source.title == "FRED Macro Data" for source in sources):
+        sources.append(
+            SourceReference(
+                title="FRED Macro Data",
+                kind="macro",
+                url="https://fred.stlouisfed.org/",
+                note="Fallback reference anchor for rates/liquidity context.",
+            )
+        )
+    if not any(source.title == "Reuters Markets" for source in sources):
+        sources.append(
+            SourceReference(
+                title="Reuters Markets",
+                kind="news",
+                url="https://www.reuters.com/markets/",
+                note="Fallback reference news desk when live headline ingestion is unavailable.",
+            )
+        )
+    sources.append(
+        SourceReference(
+            title="Local thesis synthesis",
+            kind="internal",
+            note=(
+                f"External intelligence status: {external_intelligence.status}."
+            ),
+        )
+    )
+    return sources
 
 
 def _bias_from_change(change: float) -> str:

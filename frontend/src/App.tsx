@@ -1,5 +1,4 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
-import { ProgressCircle } from "@tremor/react/dist/components/vis-elements/ProgressCircle/ProgressCircle";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -21,9 +20,13 @@ import {
 import { useMemo, useState } from "react";
 
 import { PnlChart } from "./components/dashboard/pnl-chart";
+import { AgentRuntimePanel } from "./components/dashboard/agent-runtime-panel";
+import { AgentWorkflowStudio } from "./components/dashboard/agent-workflow-studio";
 import { FactorRadar, type RadarAxis } from "./components/dashboard/factor-radar";
+import { MacroIntelligencePanel } from "./components/dashboard/macro-intelligence-panel";
 import { PositionsHeatmap, type HeatmapCell } from "./components/dashboard/positions-heatmap";
 import { PriceChart, type PriceMarker } from "./components/dashboard/price-chart";
+import { PerformancePanel } from "./components/dashboard/performance-panel";
 import { SignalLog } from "./components/dashboard/signal-log";
 import { StrategyFactoryPanel } from "./components/dashboard/strategy-factory-panel";
 import { ThesisEvidencePanel } from "./components/dashboard/thesis-evidence-panel";
@@ -49,6 +52,7 @@ type WorkspaceSection =
   | "overview"
   | "market"
   | "thesis"
+  | "workflow"
   | "strategy"
   | "analytics"
   | "operations"
@@ -66,6 +70,7 @@ function describeEvent(
       recommendation: "buy" | "sell" | "hold" | "reduce" | "wait",
       options?: { uppercase?: boolean },
     ) => string;
+    formatRole: (role: AgentAnalysisResult["role"]) => string;
   },
 ): string {
   const payload = event.payload;
@@ -85,6 +90,13 @@ function describeEvent(
     case "agent.analysis.requested":
       return helpers.t("event.analysisRequested", {
         symbol: String(payload.symbol ?? "selected instrument"),
+      });
+    case "agent.role.completed":
+      return helpers.t("event.agentRoleCompleted", {
+        role: helpers.formatRole(
+          String(payload.run_role ?? "data") as AgentAnalysisResult["role"],
+        ),
+        symbol: String(payload.symbol ?? "instrument"),
       });
     case "agent.analysis.completed":
       return helpers.t("event.analysisCompleted", {
@@ -397,7 +409,11 @@ export default function App() {
     risk,
     strategyStatus,
     strategyArtifacts,
+    agentRuntime,
+    paperPerformance,
+    backtestReport,
     latestAnalysis,
+    workflow,
     connectionStatus,
     connectionMessage,
     eventFeed,
@@ -418,6 +434,7 @@ export default function App() {
     requestLiveModeAction,
     toggleStrategyFactoryAction,
     generateStrategyAction,
+    runBacktestAction,
   } = useMarketRuntime();
   const [liveConfirmationText, setLiveConfirmationText] = useState("");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>("overview");
@@ -465,8 +482,9 @@ export default function App() {
         describeEvent(event, {
           t,
           formatRecommendation,
+          formatRole,
         }),
-    [formatRecommendation, t],
+    [formatRecommendation, formatRole, t],
   );
 
   const localizedConnectionMessage = useMemo(
@@ -733,8 +751,6 @@ export default function App() {
       unrealizedPnl,
     ],
   );
-  const railWatchlistItems = useMemo(() => snapshot.snapshots.slice(0, 4), [snapshot.snapshots]);
-
   const navigationItems = [
     {
       id: "overview" as const,
@@ -757,6 +773,14 @@ export default function App() {
             uppercase: true,
           })
         : t("thesis.pending"),
+    },
+    {
+      id: "workflow" as const,
+      icon: Cable,
+      label: t("shell.workflowTitle"),
+      meta: workflow?.active_stage_key
+        ? t(`workflow.stage.${workflow.active_stage_key}`)
+        : t("workflow.noActiveStage"),
     },
     {
       id: "strategy" as const,
@@ -789,17 +813,25 @@ export default function App() {
 
   const activeNavigationItem =
     navigationItems.find((item) => item.id === activeSection) ?? navigationItems[0];
+  const showMarketDeckHeader = activeSection !== "market";
+  const showThesisHeader = activeSection !== "thesis";
+  const showStrategyHeader = activeSection !== "strategy";
+  const showAnalyticsHeader = activeSection !== "analytics";
+  const showOperatorHeader = activeSection !== "operations";
+  const showDiagnosticsHeader = activeSection !== "diagnostics";
 
   const marketDeckPanel = (
     <Card className="panel-card market-deck workspace-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("marketDeck.kicker")}</p>
-          <CardTitle>{t("marketDeck.title")}</CardTitle>
-          <CardDescription>{t("marketDeck.description")}</CardDescription>
-        </div>
-        <Badge color="cyan">{t("marketDeck.feeds", { count: snapshot.snapshots.length })}</Badge>
-      </CardHeader>
+      {showMarketDeckHeader ? (
+        <CardHeader className="panel-headline">
+          <div>
+            <p className="section-label">{t("marketDeck.kicker")}</p>
+            <CardTitle>{t("marketDeck.title")}</CardTitle>
+            <CardDescription>{t("marketDeck.description")}</CardDescription>
+          </div>
+          <Badge color="cyan">{t("marketDeck.feeds", { count: snapshot.snapshots.length })}</Badge>
+        </CardHeader>
+      ) : null}
       <CardContent>
         <div className="instrument-strip">
           {snapshot.snapshots.map((item: MarketSnapshot) => {
@@ -868,17 +900,19 @@ export default function App() {
   );
 
   const thesisPanel = (
-    <Card className="panel-card thesis-panel workspace-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("thesis.kicker")}</p>
-          <CardTitle>{t("thesis.title")}</CardTitle>
-          <CardDescription>{t("thesis.description")}</CardDescription>
-        </div>
-        <Badge color={latestAnalysis?.status === "fallback" ? "amber" : "green"}>
-          {latestAnalysis ? formatAnalysisStatus(latestAnalysis.status, t) : t("thesis.pending")}
-        </Badge>
-      </CardHeader>
+    <Card className="panel-card thesis-panel workspace-card" data-testid="thesis-panel">
+      {showThesisHeader ? (
+        <CardHeader className="panel-headline">
+          <div>
+            <p className="section-label">{t("thesis.kicker")}</p>
+            <CardTitle>{t("thesis.title")}</CardTitle>
+            <CardDescription>{t("thesis.description")}</CardDescription>
+          </div>
+          <Badge color={latestAnalysis?.status === "fallback" ? "amber" : "green"}>
+            {latestAnalysis ? formatAnalysisStatus(latestAnalysis.status, t) : t("thesis.pending")}
+          </Badge>
+        </CardHeader>
+      ) : null}
       <CardContent>
         {latestAnalysis ? (
           <div className="thesis-layout">
@@ -892,11 +926,19 @@ export default function App() {
                     })}
                   </h3>
                 </div>
-                <Badge color={riskTone(riskScore) === "red" ? "red" : "cyan"}>
+                <Badge
+                  color={riskTone(riskScore) === "red" ? "red" : "cyan"}
+                  title={latestAnalysis.provider}
+                >
                   {latestAnalysis.provider}
                 </Badge>
               </div>
-              <p>{latestAnalysis.outputs.at(-1)?.summary ?? t("thesis.noSummary")}</p>
+              <p
+                className="clamp-3 copy-break"
+                title={latestAnalysis.outputs.at(-1)?.summary ?? t("thesis.noSummary")}
+              >
+                {latestAnalysis.outputs.at(-1)?.summary ?? t("thesis.noSummary")}
+              </p>
               <div className="thesis-role-grid">
                 {latestAnalysis.outputs.map((role) => (
                   <article className="thesis-role-card" key={role.role}>
@@ -918,7 +960,9 @@ export default function App() {
                           formatPercent,
                         })}
                       </strong>
-                      <p>{role.summary}</p>
+                      <p className="clamp-2 copy-break" title={role.summary}>
+                        {role.summary}
+                      </p>
                     </div>
                   </article>
                 ))}
@@ -944,7 +988,9 @@ export default function App() {
                         <strong className="event-outcome">{eventSummary.outcomeLabel}</strong>
                         <span>{formatTime(event.generated_at)}</span>
                       </div>
-                      <p>{describedEvent(event)}</p>
+                      <p className="clamp-2 copy-break" title={describedEvent(event)}>
+                        {describedEvent(event)}
+                      </p>
                     </article>
                   );
                 })}
@@ -960,19 +1006,31 @@ export default function App() {
 
   const extensionPanel = (
     <Card className="panel-card extension-panel workspace-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("extensions.kicker")}</p>
-          <CardTitle>{t("extensions.title")}</CardTitle>
-          <CardDescription>{t("extensions.description")}</CardDescription>
-        </div>
-        <Badge color={strategyStatus.enabled ? "green" : "amber"}>
-          {strategyStatus.enabled ? t("strategy.enabled") : t("strategy.disabled")}
-        </Badge>
-      </CardHeader>
+      {showStrategyHeader ? (
+        <CardHeader className="panel-headline">
+          <div>
+            <p className="section-label">{t("extensions.kicker")}</p>
+            <CardTitle>{t("extensions.title")}</CardTitle>
+            <CardDescription>{t("extensions.description")}</CardDescription>
+          </div>
+          <Badge color={strategyStatus.enabled ? "green" : "amber"}>
+            {strategyStatus.enabled ? t("strategy.enabled") : t("strategy.disabled")}
+          </Badge>
+        </CardHeader>
+      ) : null}
       <CardContent>
         <div className="extension-grid">
           <ThesisEvidencePanel macroRole={thesisMacroRole} />
+          <MacroIntelligencePanel
+            symbol={selectedInstrument.symbol}
+            timeframe={selectedInstrument.timeframe}
+          />
+          <AgentRuntimePanel
+            latestAnalysis={latestAnalysis}
+            agentRuntime={agentRuntime}
+            execution={execution}
+            eventFeed={eventFeed}
+          />
           <StrategyFactoryPanel
             status={strategyStatus}
             artifacts={strategyArtifacts}
@@ -987,16 +1045,18 @@ export default function App() {
 
   const analyticsPanel = (
     <Card className="panel-card analytics-panel workspace-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("analytics.kicker")}</p>
-          <CardTitle>{t("analytics.title")}</CardTitle>
-          <CardDescription>{t("analytics.description")}</CardDescription>
-        </div>
-        <Badge color="cyan">
-          {t("analytics.signalLog.entries", { count: signalLogEvents.length })}
-        </Badge>
-      </CardHeader>
+      {showAnalyticsHeader ? (
+        <CardHeader className="panel-headline">
+          <div>
+            <p className="section-label">{t("analytics.kicker")}</p>
+            <CardTitle>{t("analytics.title")}</CardTitle>
+            <CardDescription>{t("analytics.description")}</CardDescription>
+          </div>
+          <Badge color="cyan">
+            {t("analytics.signalLog.entries", { count: signalLogEvents.length })}
+          </Badge>
+        </CardHeader>
+      ) : null}
       <CardContent>
         <div className="analytics-grid">
           <SignalLog
@@ -1006,6 +1066,12 @@ export default function App() {
             summarizeEvent={(event) => formatEventSummaryLabels(event, t)}
           />
           <div className="analytics-side-grid">
+            <PerformancePanel
+              paperReport={paperPerformance}
+              backtestReport={backtestReport}
+              pendingAction={pendingAction}
+              onRunBacktest={runBacktestAction}
+            />
             <PositionsHeatmap cells={heatmapCells} />
             <FactorRadar
               axes={factorAxes}
@@ -1019,18 +1085,20 @@ export default function App() {
 
   const operatorPanel = (
     <Card className="panel-card operator-panel workspace-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("operator.kicker")}</p>
-          <CardTitle>{t("operator.title")}</CardTitle>
-          <CardDescription>{t("operator.description")}</CardDescription>
-        </div>
-        <Badge color={execution.engine_status === "running" ? "green" : "amber"}>
-          {execution.engine_status === "running"
-            ? t("operator.executionActive")
-            : t("operator.executionPaused")}
-        </Badge>
-      </CardHeader>
+      {showOperatorHeader ? (
+        <CardHeader className="panel-headline">
+          <div>
+            <p className="section-label">{t("operator.kicker")}</p>
+            <CardTitle>{t("operator.title")}</CardTitle>
+            <CardDescription>{t("operator.description")}</CardDescription>
+          </div>
+          <Badge color={execution.engine_status === "running" ? "green" : "amber"}>
+            {execution.engine_status === "running"
+              ? t("operator.executionActive")
+              : t("operator.executionPaused")}
+          </Badge>
+        </CardHeader>
+      ) : null}
       <CardContent className="operator-stack">
         <div className="operator-card-grid">
           <div className="operator-card">
@@ -1163,16 +1231,18 @@ export default function App() {
 
   const diagnosticsPanel = (
     <Card className="panel-card diagnostics-card workspace-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("diagnostics.kicker")}</p>
-          <CardTitle>{t("diagnostics.title")}</CardTitle>
-          <CardDescription>{t("diagnostics.description")}</CardDescription>
-        </div>
-        <Badge color={snapshot.runtime.warnings.length > 0 ? "amber" : "green"}>
-          {t("diagnostics.warnings", { count: snapshot.runtime.warnings.length })}
-        </Badge>
-      </CardHeader>
+      {showDiagnosticsHeader ? (
+        <CardHeader className="panel-headline">
+          <div>
+            <p className="section-label">{t("diagnostics.kicker")}</p>
+            <CardTitle>{t("diagnostics.title")}</CardTitle>
+            <CardDescription>{t("diagnostics.description")}</CardDescription>
+          </div>
+          <Badge color={snapshot.runtime.warnings.length > 0 ? "amber" : "green"}>
+            {t("diagnostics.warnings", { count: snapshot.runtime.warnings.length })}
+          </Badge>
+        </CardHeader>
+      ) : null}
       <CardContent className="diagnostics-stack">
         <div className="diagnostic-row">
           <div>
@@ -1208,15 +1278,22 @@ export default function App() {
         </div>
         <div className="diagnostic-row">
           <div>
-            <span className="section-label">{t("hero.aiProvider")}</span>
-            <strong>{heroProviderLabel}</strong>
+              <span className="section-label">{t("hero.aiProvider")}</span>
+            <strong className="token-ellipsis" title={heroProviderLabel}>
+              {heroProviderLabel}
+            </strong>
           </div>
           <Bot size={18} className="muted-icon" />
         </div>
         <div className="diagnostic-row">
           <div>
             <span className="section-label">{t("runtime.marketDetail")}</span>
-            <strong>{marketData.detail ?? localizedConnectionMessage}</strong>
+            <strong
+              className="clamp-2 copy-break"
+              title={marketData.detail ?? localizedConnectionMessage}
+            >
+              {marketData.detail ?? localizedConnectionMessage}
+            </strong>
           </div>
           <AlertTriangle size={18} className="muted-icon" />
         </div>
@@ -1242,8 +1319,8 @@ export default function App() {
       <CardHeader className="panel-headline">
         <div>
           <p className="section-label">{t("hero.runtimeDigest")}</p>
-          <CardTitle>{t("shell.overviewTitle")}</CardTitle>
-          <CardDescription>{t("shell.overviewDescription")}</CardDescription>
+          <CardTitle>{t("overview.runtimeTitle")}</CardTitle>
+          <CardDescription>{t("overview.runtimeDescription")}</CardDescription>
         </div>
         <Badge color={viewModel.systemStatus === "normal" ? "green" : viewModel.systemStatus === "fallback" ? "amber" : "red"}>
           {systemStatusLabel}
@@ -1253,7 +1330,12 @@ export default function App() {
         <div className="runtime-overview-banner">
           <span>{t("runtime.marketRequested")}</span>
           <strong>{marketDigestCard?.value ?? systemStatusLabel}</strong>
-          <p>{marketDigestCard?.meta ?? localizedConnectionMessage}</p>
+          <p
+            className="clamp-2 copy-break"
+            title={marketDigestCard?.meta ?? localizedConnectionMessage}
+          >
+            {marketDigestCard?.meta ?? localizedConnectionMessage}
+          </p>
         </div>
         <div className="runtime-overview-grid">
           <article className="runtime-overview-stat">
@@ -1270,7 +1352,9 @@ export default function App() {
           </article>
           <article className="runtime-overview-stat">
             <span>{t("hero.aiProvider")}</span>
-            <strong>{heroProviderLabel}</strong>
+            <strong className="token-ellipsis" title={heroProviderLabel}>
+              {heroProviderLabel}
+            </strong>
           </article>
           <article className="runtime-overview-stat">
             <span>{t("hero.halt")}</span>
@@ -1296,16 +1380,25 @@ export default function App() {
               ? `${latestAnalysis.symbol} · ${latestAnalysis.timeframe}`
               : t("thesis.pending")}
           </strong>
-          <p>{latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty")}</p>
+          <p
+            className="clamp-3 copy-break"
+            title={latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty")}
+          >
+            {latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty")}
+          </p>
         </div>
         <div className="runtime-overview-list runtime-overview-list--dense">
           {denseOverviewItems.map((item) => (
             <article className="runtime-overview-item runtime-overview-item--compact" key={item.id}>
               <div className="runtime-overview-line">
                 <span>{item.label}</span>
-                <strong>{item.value}</strong>
+                <strong className="token-ellipsis" title={item.value}>
+                  {item.value}
+                </strong>
               </div>
-              <p>{item.detail}</p>
+              <p className="clamp-2 copy-break" title={item.detail}>
+                {item.detail}
+              </p>
             </article>
           ))}
         </div>
@@ -1313,145 +1406,69 @@ export default function App() {
     </Card>
   );
 
-  const quickActionsCard = (
-    <Card className="panel-card rail-card quick-actions-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("hero.controls")}</p>
-          <CardTitle>{t("operator.title")}</CardTitle>
-          <CardDescription>{t("operator.description")}</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="operator-actions two-up compact-actions-grid">
-          <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
-            <Bot size={16} />
-            {t("operator.runAnalysis")}
-          </Button>
-          <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
-            <ArrowUpRight size={16} />
-            {t("operator.dispatchPaper")}
-          </Button>
-          <Button variant="secondary" onClick={refreshAll} disabled={Boolean(pendingAction)}>
-            <RefreshCcw size={16} />
-            {t("hero.refresh")}
-          </Button>
-          <Button variant="ghost" onClick={reconnect}>
-            <Cable size={16} />
-            {t("hero.reconnect")}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+  const workflowStudioPanel = (
+    <AgentWorkflowStudio
+      workflow={workflow}
+      agentRuntime={agentRuntime}
+      latestAnalysis={latestAnalysis}
+      eventFeed={eventFeed}
+      paperPerformance={paperPerformance}
+      backtestReport={backtestReport}
+      strategyStatus={strategyStatus}
+      execution={execution}
+      describeEvent={describedEvent}
+    />
   );
 
-  const railRuntimeCard = (
-    <Card className="panel-card rail-card">
-      <CardHeader className="panel-headline">
-        <div>
-          <p className="section-label">{t("runtime.systemStatus")}</p>
-          <CardTitle>{selectedMarketBadge}</CardTitle>
-          <CardDescription>{localizedConnectionMessage}</CardDescription>
-        </div>
-        <Badge color={viewModel.systemStatus === "normal" ? "green" : viewModel.systemStatus === "fallback" ? "amber" : "red"}>
-          {systemStatusLabel}
-        </Badge>
-      </CardHeader>
-      <CardContent>
-        <div className="rail-runtime-summary">
-          <div>
-            <span>{t("marketDeck.selected")}</span>
-            <strong>{selectedMarketHeroValue}</strong>
-            <p data-positive={selectedMarket ? selectedMarket.change_percent >= 0 : undefined}>
-              {selectedMarketHeroMeta}
-            </p>
-          </div>
-          <Badge color={viewModel.realSourceRequested ? "cyan" : "amber"}>
-            {marketData.requested_source.toUpperCase()}
-          </Badge>
-        </div>
-        <div className="rail-runtime-grid rail-runtime-grid--dense">
-          <div>
-            <span>{t("hero.aiProvider")}</span>
-            <strong>{heroProviderLabel}</strong>
-            <p>{snapshot.runtime.exchange_id}</p>
-          </div>
-          <div>
-            <span>{t("runtime.marketRequested")}</span>
-            <strong>{marketData.requested_source.toUpperCase()}</strong>
-            <p>{resolveMarketSourceLabel(marketData.requested_source, t)}</p>
-          </div>
-          <div>
-            <span>{t("runtime.marketEffective")}</span>
-            <strong>{resolveMarketSourceLabel(marketData.effective_source, t)}</strong>
-            <p>{marketStatusLabel}</p>
-          </div>
-          <div>
-            <span>{t("diagnostics.warnings", { count: snapshot.runtime.warnings.length })}</span>
-            <strong>{snapshot.runtime.warnings.length}</strong>
-            <p>{marketData.detail ?? localizedConnectionMessage}</p>
-          </div>
-          <div>
-            <span>{t("analytics.signalLog.title")}</span>
-            <strong>{signalLogEvents.length}</strong>
-            <p>{t("rail.eventBuffer", { count: eventFeed.length })}</p>
-          </div>
-          <div>
-            <span>{t("diagnostics.retries")}</span>
-            <strong>{reconnectAttempts}</strong>
-            <p>{connectionMessage || actionMessage || localizedConnectionMessage}</p>
-          </div>
-          <div>
-            <span>{lastEventAt ? t("hero.lastEvent", { time: formatTime(lastEventAt) }) : t("hero.awaitingEvents")}</span>
-            <strong>{lastEventAt ? formatTime(lastEventAt) : t("hero.awaitingEvents")}</strong>
-            <p>
-              {t("rail.orderPositionSummary", {
-                orders: execution.recent_orders.length,
-                positions: execution.positions.length,
-              })}
-            </p>
-          </div>
-        </div>
-        <div className="rail-watchlist">
-          {railWatchlistItems.map((item) => {
-            const active =
-              item.symbol === selectedMarket?.symbol && item.timeframe === selectedMarket?.timeframe;
-            return (
-              <button
-                key={`${item.symbol}:${item.timeframe}`}
-                type="button"
-                className="rail-watchlist-item"
-                data-active={active}
-                onClick={() => setSelectedInstrument({ symbol: item.symbol, timeframe: item.timeframe })}
-              >
-                <div className="rail-watchlist-copy">
-                  <span>{item.symbol}</span>
-                  <small>{item.timeframe}</small>
-                </div>
-                <strong data-positive={item.change_percent >= 0}>{formatPercent(item.change_percent)}</strong>
-                <p>{formatCurrency(item.last_price)}</p>
-              </button>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+  const quickActionButtons = (
+    <div className="operator-actions two-up compact-actions-grid">
+      <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
+        <Bot size={16} />
+        {t("operator.runAnalysis")}
+      </Button>
+      <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
+        <ArrowUpRight size={16} />
+        {t("operator.dispatchPaper")}
+      </Button>
+      <Button variant="secondary" onClick={refreshAll} disabled={Boolean(pendingAction)}>
+        <RefreshCcw size={16} />
+        {t("hero.refresh")}
+      </Button>
+      <Button variant="ghost" onClick={reconnect}>
+        <Cable size={16} />
+        {t("hero.reconnect")}
+      </Button>
+    </div>
   );
 
-  const railDigestCard = (
-    <Card className="panel-card rail-card">
+  const workflowStageLabel = workflow?.active_stage_key
+    ? t(`workflow.stage.${workflow.active_stage_key}`)
+    : t("workflow.noActiveStage");
+  const workflowStageDetail = (() => {
+    if (!workflow?.active_stage_key) {
+      return t("workflow.noDetail");
+    }
+    return workflow.stages[workflow.active_stage_key]?.detail ?? t("workflow.noDetail");
+  })();
+  const executionStatusLabel =
+    execution.engine_status === "running"
+      ? t("operator.executionActive")
+      : t("operator.executionPaused");
+
+  const overviewDigestPanel = (
+    <Card className="panel-card overview-digest-card workspace-card">
       <CardHeader className="panel-headline">
         <div>
           <p className="section-label">{t("hero.runtimeDigest")}</p>
-          <CardTitle>{t("hero.runtimeDigest")}</CardTitle>
-          <CardDescription>{t("hero.runtimeDigestDescription")}</CardDescription>
+          <CardTitle>{t("overview.digestTitle")}</CardTitle>
+          <CardDescription>{t("overview.digestDescription")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="rail-digest-list">
+        <div className="overview-digest-list">
           {digestCards.map(({ item, content }) => (
-            <article className="rail-digest-item" data-tone={item.tone} key={item.id}>
-              <div className="rail-digest-topline">
+            <article className="overview-digest-item" data-tone={item.tone} key={item.id}>
+              <div className="overview-digest-topline">
                 <span>{t(`digest.source.${item.source}`)}</span>
                 <strong>{content.label}</strong>
               </div>
@@ -1463,12 +1480,67 @@ export default function App() {
     </Card>
   );
 
+  const overviewWorkflowCard = (
+    <Card className="panel-card overview-workflow-card workspace-card">
+      <CardHeader className="panel-headline">
+        <div>
+          <p className="section-label">{t("workflow.notices")}</p>
+          <CardTitle>{t("overview.operationsTitle")}</CardTitle>
+          <CardDescription>{t("overview.operationsDescription")}</CardDescription>
+        </div>
+        <Badge color={riskTone(riskScore)}>{t(riskLabelKey(riskScore))}</Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="overview-workflow-grid">
+          <article>
+            <span>{t("workflow.active")}</span>
+            <strong>{workflowStageLabel}</strong>
+            <p className="clamp-2 copy-break" title={workflowStageDetail}>
+              {workflowStageDetail}
+            </p>
+          </article>
+          <article>
+            <span>{t("hero.execution")}</span>
+            <strong>{executionStatusLabel}</strong>
+            <p className="clamp-2 copy-break">{t("overview.paperExecutionDetail")}</p>
+          </article>
+          <article>
+            <span>{t("kpi.positions")}</span>
+            <strong>
+              {execution.positions.length} · {formatCurrency(totalExposure)}
+            </strong>
+            <p className="clamp-2 copy-break">{t("kpi.exposureBody")}</p>
+          </article>
+          <article>
+            <span>{t("overview.riskTitle")}</span>
+            <strong data-tone={riskTone(riskScore)}>{t(riskLabelKey(riskScore))}</strong>
+            <p className="clamp-2 copy-break">
+              {formatCurrency(unrealizedPnl)} · {t("kpi.unrealizedBody")}
+            </p>
+          </article>
+          <article>
+            <span>{t("hero.aiProvider")}</span>
+            <strong className="token-ellipsis" title={heroProviderLabel}>
+              {heroProviderLabel}
+            </strong>
+            <p className="clamp-2 copy-break" title={snapshot.runtime.exchange_id}>
+              {snapshot.runtime.exchange_id}
+            </p>
+          </article>
+        </div>
+        <div className="overview-quick-actions">{quickActionButtons}</div>
+      </CardContent>
+    </Card>
+  );
+
   const workspaceContent = (() => {
     switch (activeSection) {
       case "market":
         return <div className="workspace-stack">{marketDeckPanel}</div>;
       case "thesis":
         return <div className="workspace-stack">{thesisPanel}</div>;
+      case "workflow":
+        return <div className="workspace-stack">{workflowStudioPanel}</div>;
       case "strategy":
         return <div className="workspace-stack">{extensionPanel}</div>;
       case "analytics":
@@ -1481,23 +1553,24 @@ export default function App() {
           </div>
         );
       case "diagnostics":
-        return (
-          <div className="workspace-section-grid two-column-grid">
-            <div className="workspace-stack workspace-column-wide">{diagnosticsPanel}</div>
-            <div className="workspace-stack">{runtimeOverviewPanel}</div>
-          </div>
-        );
+        return <div className="workspace-stack workspace-column-wide">{diagnosticsPanel}</div>;
       case "overview":
       default:
         return (
-          <div className="workspace-section-grid overview-grid">
-            <div className="workspace-stack workspace-column-wide">
-              {marketDeckPanel}
-              {thesisPanel}
+          <div className="workspace-section-grid overview-grid overview-grid--focus">
+            <div className="overview-column overview-column--primary">
+              <div className="workspace-stack">
+                {runtimeOverviewPanel}
+              </div>
+              <div className="workspace-stack overview-secondary-stack">
+                {overviewDigestPanel}
+                {overviewWorkflowCard}
+              </div>
             </div>
-            <div className="workspace-stack">
-              {runtimeOverviewPanel}
-              {extensionPanel}
+            <div className="overview-column overview-column--secondary">
+              <div className="workspace-stack">
+                {marketDeckPanel}
+              </div>
             </div>
           </div>
         );
@@ -1514,7 +1587,7 @@ export default function App() {
           <div className="terminal-brand-copy">
             <p className="eyebrow">{t("hero.phase")}</p>
             <h1>SFC-Quant</h1>
-            <p>{t("hero.paperGuard")}</p>
+            <p data-testid="paper-guard-banner">{t("hero.paperGuard")}</p>
           </div>
         </div>
 
@@ -1528,15 +1601,33 @@ export default function App() {
 
         <div className="terminal-topbar-actions">
           <div className="terminal-status-strip">
-            <div className="terminal-status-chip" data-tone={viewModel.topStates.execution === "paper" ? "success" : "danger"}>
+            <div
+              className="terminal-status-chip"
+              data-testid="execution-mode-chip"
+              data-tone={viewModel.topStates.execution === "paper" ? "success" : "danger"}
+            >
               <span>{t("hero.execution")}</span>
               <strong>{viewModel.topStates.execution.toUpperCase()}</strong>
             </div>
-            <div className="terminal-status-chip" data-tone={viewModel.topStates.system === "normal" ? "success" : viewModel.topStates.system === "fallback" ? "warning" : "danger"}>
+            <div
+              className="terminal-status-chip"
+              data-testid="system-status-chip"
+              data-tone={
+                viewModel.topStates.system === "normal"
+                  ? "success"
+                  : viewModel.topStates.system === "fallback"
+                    ? "warning"
+                    : "danger"
+              }
+            >
               <span>{t("runtime.systemStatus")}</span>
               <strong>{systemStatusLabel}</strong>
             </div>
-            <div className="terminal-status-chip" data-tone={viewModel.topStates.halt === "clear" ? "success" : "danger"}>
+            <div
+              className="terminal-status-chip"
+              data-testid="risk-halt-chip"
+              data-tone={viewModel.topStates.halt === "clear" ? "success" : "danger"}
+            >
               <span>{t("hero.halt")}</span>
               <strong>
                 {viewModel.topStates.halt === "clear" ? t("hero.haltClear") : t("hero.haltEngaged")}
@@ -1578,6 +1669,7 @@ export default function App() {
                     data-active={active}
                     onClick={() => setActiveSection(item.id)}
                     aria-current={active ? "page" : undefined}
+                    aria-label={item.label}
                   >
                     <span className="terminal-nav-icon">
                       <Icon size={18} />
@@ -1599,13 +1691,34 @@ export default function App() {
             <div>
               <p className="section-label">{activeNavigationItem.meta}</p>
               <h2>{activeNavigationItem.label}</h2>
-              <p>
+              <p
+                className="clamp-2 copy-break"
+                title={
+                  activeSection === "overview"
+                    ? t("shell.overviewDescription")
+                    : activeSection === "market"
+                      ? t("marketDeck.description")
+                      : activeSection === "thesis"
+                        ? t("thesis.description")
+                        : activeSection === "workflow"
+                          ? t("shell.workflowDescription")
+                        : activeSection === "strategy"
+                          ? t("extensions.description")
+                          : activeSection === "analytics"
+                            ? t("analytics.description")
+                            : activeSection === "operations"
+                              ? t("operator.description")
+                              : t("diagnostics.description")
+                }
+              >
                 {activeSection === "overview"
                   ? t("shell.overviewDescription")
                   : activeSection === "market"
                     ? t("marketDeck.description")
                     : activeSection === "thesis"
                       ? t("thesis.description")
+                      : activeSection === "workflow"
+                        ? t("shell.workflowDescription")
                       : activeSection === "strategy"
                         ? t("extensions.description")
                         : activeSection === "analytics"
@@ -1615,7 +1728,7 @@ export default function App() {
                             : t("diagnostics.description")}
               </p>
             </div>
-            <div className="workspace-header-meta">
+            <div className="workspace-header-meta" data-testid="requested-market-source">
               <span>{t("runtime.marketRequested")}</span>
               <strong>{marketDigestCard?.value ?? systemStatusLabel}</strong>
             </div>
@@ -1632,60 +1745,6 @@ export default function App() {
           </motion.div>
         </section>
 
-        <aside className="terminal-rail">
-          <div className="terminal-rail-inner">
-            {railRuntimeCard}
-            {railDigestCard}
-
-            <section className="kpi-grid rail-kpi-grid">
-              <Card className="kpi-card">
-                <CardContent className="kpi-body">
-                  <span className="section-label">{t("kpi.positions")}</span>
-                  <strong>{execution.positions.length}</strong>
-                  <p>{t("kpi.positionsBody")}</p>
-                </CardContent>
-              </Card>
-              <Card className="kpi-card">
-                <CardContent className="kpi-body">
-                  <span className="section-label">{t("kpi.exposure")}</span>
-                  <strong>{formatCurrency(totalExposure)}</strong>
-                  <p>{t("kpi.exposureBody")}</p>
-                </CardContent>
-              </Card>
-              <Card className="kpi-card">
-                <CardContent className="kpi-body">
-                  <span className="section-label">{t("kpi.unrealized")}</span>
-                  <strong data-positive={unrealizedPnl >= 0}>{formatCurrency(unrealizedPnl)}</strong>
-                  <p>{t("kpi.unrealizedBody")}</p>
-                </CardContent>
-              </Card>
-              <Card className="kpi-card risk-ring-card" data-tone={riskTone(riskScore)}>
-                <CardContent className="kpi-body risk-card-body">
-                  <div className="risk-gate-row">
-                    {viewModel.riskGateItems.map((gate) => (
-                      <div className="risk-gate-chip" data-active={gate.active} key={gate.id}>
-                        <span>{t(`riskGate.${gate.id}`)}</span>
-                        <strong>{t(`riskGate.${gate.value}`)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="risk-ring-body">
-                    <div>
-                      <span className="section-label">{t("kpi.risk")}</span>
-                      <strong>{t(riskLabelKey(riskScore))}</strong>
-                      <p>{t("kpi.riskBody")}</p>
-                    </div>
-                    <ProgressCircle value={riskScore} size="md" color={riskTone(riskScore)}>
-                      <span className="risk-score-value">{riskScore}</span>
-                    </ProgressCircle>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-
-            {quickActionsCard}
-          </div>
-        </aside>
       </div>
     </main>
   );
