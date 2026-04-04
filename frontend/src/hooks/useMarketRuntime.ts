@@ -21,6 +21,7 @@ import {
   loadStrategyArtifacts,
   loadStrategyStatus,
   requestLiveMode,
+  isStaticPreviewMode,
   resolveBackendWsUrl,
   runAnalysis,
   runBacktest,
@@ -152,6 +153,7 @@ function isStrategyEvent(type: string): boolean {
 
 export function useMarketRuntime(): MarketRuntimeState {
   const { t, formatRecommendation } = useLocale();
+  const staticPreviewMode = isStaticPreviewMode();
   const [snapshot, setSnapshot] = useState<MarketSnapshotResponse>(fallbackMarketSnapshot);
   const [execution, setExecution] = useState<ExecutionStatusResponse>(fallbackExecutionStatus);
   const [risk, setRisk] = useState<RiskStatusResponse>(fallbackRiskStatus);
@@ -353,6 +355,12 @@ export function useMarketRuntime(): MarketRuntimeState {
       return;
     }
 
+    if (staticPreviewMode) {
+      setConnectionStatus("degraded");
+      setConnectionMessage(t("runtime.preview"));
+      return;
+    }
+
     if (reconnectTimerRef.current) {
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -476,6 +484,7 @@ export function useMarketRuntime(): MarketRuntimeState {
     refreshRisk,
     refreshStrategy,
     refreshWorkflow,
+    staticPreviewMode,
     t,
   ]);
 
@@ -493,11 +502,16 @@ export function useMarketRuntime(): MarketRuntimeState {
   }, [connect]);
 
   const reconnect = useCallback(() => {
+    if (staticPreviewMode) {
+      setConnectionStatus("degraded");
+      setConnectionMessage(t("runtime.preview"));
+      return;
+    }
     reconnectAttemptsRef.current = 0;
     setReconnectAttempts(0);
     socketRef.current?.close();
     connect();
-  }, [connect]);
+  }, [connect, staticPreviewMode]);
 
   const runAction = useCallback(
     async (label: string, task: () => Promise<void>) => {

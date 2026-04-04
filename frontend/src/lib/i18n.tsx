@@ -99,6 +99,7 @@ const messages: Record<Locale, TranslationTable> = {
     "runtime.restored": "Realtime stream restored.",
     "runtime.error": "Realtime stream encountered an error.",
     "runtime.closed": "Realtime stream closed.",
+    "runtime.preview": "Static preview mode is active.",
     "runtime.ready": "Operator deck ready.",
     "runtime.analysisCompleted": ({ symbol, timeframe, recommendation }) =>
       `Analysis completed for ${symbol} ${timeframe}: ${recommendation}.`,
@@ -576,6 +577,7 @@ const messages: Record<Locale, TranslationTable> = {
     "runtime.restored": "实时流已恢复。",
     "runtime.error": "实时流发生错误。",
     "runtime.closed": "实时流已关闭。",
+    "runtime.preview": "当前为静态预览模式。",
     "runtime.ready": "操盘面板已就绪。",
     "runtime.analysisCompleted": ({ symbol, timeframe, recommendation }) =>
       `${symbol} ${timeframe} 分析完成：${recommendation}。`,

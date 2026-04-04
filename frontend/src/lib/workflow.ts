@@ -1,4 +1,4 @@
-import { resolveBackendBaseUrl } from "./market";
+import { isStaticPreviewMode, resolveBackendBaseUrl } from "./market";
 
 export type WorkflowStageKey =
   | "market"
@@ -171,6 +171,9 @@ export async function loadWorkflowSnapshot(selection?: {
   timeframe?: string;
 }): Promise<WorkflowSnapshot> {
   try {
+    if (isStaticPreviewMode()) {
+      throw new Error("Static preview mode disables workflow runtime requests.");
+    }
     const params = new URLSearchParams();
     if (selection?.symbol) {
       params.set("symbol", selection.symbol);
