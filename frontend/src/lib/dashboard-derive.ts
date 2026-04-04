@@ -20,6 +20,7 @@ export type DashboardEventOutcome =
   | "snapshot"
   | "tick"
   | "analysisRequested"
+  | "roleCompleted"
   | "analysisCompleted"
   | "signalApproved"
   | "signalBlocked"
@@ -140,6 +141,8 @@ export function deriveDashboardEventSummary(event: EventEnvelope): DashboardEven
       return { track: "market", outcome: "tick", tone: "market" };
     case "agent.analysis.requested":
       return { track: "agent", outcome: "analysisRequested", tone: "agent" };
+    case "agent.role.completed":
+      return { track: "agent", outcome: "roleCompleted", tone: "agent" };
     case "agent.analysis.completed":
       return { track: "agent", outcome: "analysisCompleted", tone: "agent" };
     case "execution.signal.approved":

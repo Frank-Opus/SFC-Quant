@@ -40,7 +40,62 @@ Optional market-data truth smoke check:
 python3 -m pytest -q backend/tests/test_market_runtime.py
 ```
 
-## 4. Inspect the dashboard
+## 4. Validate `freqtrade_rest_paper` dry-run execution
+
+1. Install or run a local Freqtrade instance with a paper-safe profile:
+
+   ```bash
+   python -m pip install freqtrade
+   freqtrade trade \
+     --strategy SampleStrategy \
+     --db-url sqlite:///var/freqtrade/db.sqlite \
+     --dry-run \
+     --api-server \
+     --api-server-port 8080 \
+     --api-host 0.0.0.0 \
+     --logfile var/logs/freqtrade.log
+   ```
+
+   The config must have `dry_run=true`, `api_server.enabled=true`, and `force_entry_enable=true`, and the host/port must match `EXECUTION_FREQTRADE_REST_BASE_URL`. Use `docker run hello-world` first if you prefer containerizing Freqtrade.
+
+2. Point the backend at that REST endpoint (`EXECUTION_ADAPTER=freqtrade_rest_paper`, plus base URL/credentials) and restart `docker compose` or `uvicorn`.
+
+3. Confirm the integration:
+
+   - `curl http://127.0.0.1:8080/api/v1/ping` returns `{"status":"ok"}` and `{"dry_run":true}` via the Freqtrade API.
+   - `curl http://localhost:8000/api/execution/status` reports `adapter=freqtrade_rest_paper`, `execution_mode=paper`, and no `rate_limit` stalls.
+   - `curl http://localhost:8000/api/diagnostics/summary` continues to expose the execution section showing the REST host and paper orders.
+   - The backend blocks orders when the REST host is unreachable rather than pretending a fill; the logs explain the failure.
+
+## 5. Verify multi-agent strategy providers (RD-Agent(Q) & TradingAgents-CN)
+
+1. RD-Agent(Q) (Linux + Docker):
+
+   - Install from PyPI/source (`pip install rdagent` or `pip install -e /Users/suhui/Documents/百度同步/Project_Interest/RD-Agent`).
+   - Confirm Docker is available via `docker run hello-world`.
+   - Validate the repo-owned shim locally:
+
+     ```bash
+     ./.runtime-venv/bin/python backend/scripts/run_rdagent.py --help
+     ```
+
+   - Enable the provider (`STRATEGY_FACTORY_ENABLED=true`, `STRATEGY_FACTORY_PROVIDER=rd_agent_q`) and let `/api/strategy/generate` or the auto-loop start.
+   - Check `GET /api/strategy/status` for `provider=rd_agent_q` with `availability=ready`. When Docker or the CLI fails, the backend reports the fallback reason instead of crashing.
+
+2. TradingAgents-CN (Python CLI):
+
+   - Install dependencies (`pip install -e /tmp/TradingAgents-CN` or `pip install tradingagents` once published).
+   - The upstream `tradingagents` console script is currently mispackaged. Validate the callable entrypoint through the repo shim instead:
+
+     ```bash
+     ./.runtime-venv/bin/python backend/scripts/run_tradingagents.py help
+     ```
+
+   - Switch to `STRATEGY_FACTORY_PROVIDER=tradingagents_cn` and set `STRATEGY_FACTORY_TRADINGAGENTS_COMMAND` to an explicit callable command. Treat this provider as honest beta wiring: CLI reachability can be validated now, while fully unattended generation may still need extra provider automation.
+   - `/api/strategy/status` should list `provider=tradingagents_cn` and log artifact files under `./var/strategy_factory/tradingagents-*` when successful.
+   - Any missing CLI or exceptions are surfaced in the provider `reason` field to keep the system honest.
+
+## 6. Inspect the dashboard
 
 Open `http://localhost:5173` and confirm:
 
@@ -52,11 +107,11 @@ Open `http://localhost:5173` and confirm:
 - strategy factory can be enabled and can generate review artifacts
 - operator deck can pause/resume, halt/clear, and request live mode
 
-## 5. Inspect structured logs
+## 7. Inspect structured logs
 
 Watch backend stdout while triggering actions. You should see JSON log lines for startup, shutdown, and event publication.
 
-## 6. Safe demo path
+## 8. Safe demo path
 
 Recommended demo order:
 
@@ -75,14 +130,14 @@ Optional real-market demo:
 3. verify `/health` or `/api/diagnostics/summary` reports requested source `ccxt`
 4. if exchange reads fail, confirm the runtime reports fallback/degraded state instead of pretending live data is active
 
-## 7. Safety reminders
+## 9. Safety reminders
 
 - stay in `APP_MODE=mock` unless you intentionally need paper-ready/live-ready behavior
 - the default release profile already requests real market data; use `MARKET_DATA_MODE=mock` only when you intentionally want a deterministic local-only demo
 - do not enable live mode without explicit credentials and confirmation text
 - treat strategy artifacts as review material, not auto-trading logic
 
-## 8. Real-market / live-readiness planning
+## 10. Real-market / live-readiness planning
 
 Before attempting true exchange-backed operation, read `docs/runbooks/live-trading-readiness.md`.
 

@@ -149,6 +149,8 @@ export type ExecutionOrder = {
   fill_value: number | null;
   fee_paid: number;
   adapter: string;
+  adapter_trade_id?: string | null;
+  adapter_detail?: string | null;
   created_at: string;
   filled_at: string | null;
   rationale_summary: string;
@@ -160,13 +162,24 @@ export type PaperPosition = {
   avg_entry_price: number;
   market_price: number;
   unrealized_pnl: number;
+  adapter_trade_id?: string | null;
   updated_at: string;
+};
+
+export type ExecutionAdapterRuntime = {
+  configured: boolean;
+  status: "mock" | "connected" | "degraded" | "offline";
+  detail: string;
+  last_checked_at: string | null;
+  last_error: string | null;
+  endpoint: string | null;
 };
 
 export type ExecutionStatusResponse = {
   engine_status: "running" | "paused";
   execution_mode: string;
   adapter: string;
+  adapter_runtime: ExecutionAdapterRuntime;
   starting_balance: number;
   cash_balance: number;
   equity_estimate: number;
@@ -207,6 +220,42 @@ export type StrategyArtifactFile = {
   kind: "markdown" | "json" | "python" | "text";
 };
 
+export type StrategyInvocationArtifact = {
+  label: string;
+  path: string;
+  kind: "markdown" | "json" | "python" | "text";
+  exists: boolean;
+};
+
+export type StrategyGenerationLogEntry = {
+  generated_at: string;
+  level: "info" | "warning" | "error";
+  phase:
+    | "idle"
+    | "preparing"
+    | "writing_artifacts"
+    | "invoking_provider"
+    | "collecting_artifacts"
+    | "completed"
+    | "failed"
+    | "timeout";
+  provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external" | null;
+  message: string;
+};
+
+export type StrategyProviderRun = {
+  provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external";
+  label: string;
+  command: string[];
+  status: "completed" | "failed" | "timeout";
+  started_at: string | null;
+  completed_at: string | null;
+  returncode: number | null;
+  timeout_seconds: number | null;
+  detail: string | null;
+  artifacts: StrategyInvocationArtifact[];
+};
+
 export type StrategyArtifact = {
   artifact_id: string;
   symbol: string;
@@ -214,18 +263,30 @@ export type StrategyArtifact = {
   run_id: string;
   created_at: string;
   configured_provider: string;
-  effective_provider: "mock_rdq" | "rd_agent_q" | "external";
+  effective_provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external";
   recommendation: "buy" | "sell" | "hold" | "reduce" | "wait";
   summary: string;
   directory: string;
   files: StrategyArtifactFile[];
+  provider_run: StrategyProviderRun | null;
 };
 
 export type StrategyGenerationState = {
   status: "idle" | "running" | "completed" | "failed" | "timeout";
+  phase:
+    | "idle"
+    | "preparing"
+    | "writing_artifacts"
+    | "invoking_provider"
+    | "collecting_artifacts"
+    | "completed"
+    | "failed"
+    | "timeout";
   symbol: string | null;
   timeframe: string | null;
   run_id: string | null;
+  active_provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external" | null;
+  provider_label: string | null;
   artifact_directory: string | null;
   started_at: string | null;
   updated_at: string | null;
@@ -234,24 +295,154 @@ export type StrategyGenerationState = {
   stdout_path: string | null;
   stderr_path: string | null;
   run_meta_path: string | null;
+  logs: StrategyGenerationLogEntry[];
+  artifacts: StrategyInvocationArtifact[];
+};
+
+export type StrategyProviderRuntime = {
+  provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external";
+  label: string;
+  configured: boolean;
+  effective: boolean;
+  available: boolean;
+  availability: "ready" | "fallback" | "unavailable";
+  reason: string | null;
+  command: string | null;
+  timeout_seconds: number | null;
+  requires_docker: boolean;
+  invocation_prefix: string | null;
 };
 
 export type StrategyFactoryStatusResponse = {
   enabled: boolean;
   configured_provider: string;
-  effective_provider: "mock_rdq" | "rd_agent_q" | "external";
+  effective_provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external";
   workspace: string;
   auto_generate: boolean;
   reason: string | null;
   artifact_count: number;
   latest_artifact: StrategyArtifact | null;
   generation: StrategyGenerationState;
+  providers: StrategyProviderRuntime[];
 };
 
 export type StrategyGenerationResponse = {
   message: string;
   artifact: StrategyArtifact;
   status: StrategyFactoryStatusResponse;
+};
+
+export type AgentRuntimeRecord = {
+  agent_id: string;
+  category: "strategy_factory";
+  provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external";
+  label: string;
+  enabled: boolean;
+  configured: boolean;
+  effective: boolean;
+  available: boolean;
+  status: "disabled" | "ready" | "running" | "completed" | "failed" | "timeout" | "fallback" | "unavailable";
+  phase: StrategyGenerationState["phase"];
+  symbol: string | null;
+  timeframe: string | null;
+  run_id: string | null;
+  detail: string | null;
+  workspace: string;
+  artifact_directory: string | null;
+  latest_artifact_directory: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  logs: StrategyGenerationLogEntry[];
+  artifacts: StrategyInvocationArtifact[];
+};
+
+export type AgentRuntimeSummaryResponse = {
+  generated_at: string;
+  strategy_factory_enabled: boolean;
+  configured_provider: string;
+  effective_provider: "mock_rdq" | "rd_agent_q" | "tradingagents_cn" | "external";
+  agents: AgentRuntimeRecord[];
+};
+
+export type EquityCurvePoint = {
+  timestamp: string;
+  equity: number;
+  cash_balance: number;
+  drawdown: number;
+  drawdown_amount: number;
+};
+
+export type PerformanceTrade = {
+  trade_id: string;
+  symbol: string;
+  timeframe: string;
+  opened_at: string;
+  closed_at: string;
+  quantity: number;
+  entry_price: number;
+  exit_price: number;
+  pnl: number;
+  pnl_percent: number;
+  fees_paid: number;
+  outcome: "win" | "loss" | "flat";
+  run_id: string | null;
+};
+
+export type PerformanceReport = {
+  mode: "paper" | "backtest";
+  symbol: string | null;
+  timeframe: string | null;
+  source: string | null;
+  strategy: string | null;
+  starting_balance: number;
+  ending_balance: number;
+  total_return: number;
+  max_drawdown: number;
+  win_rate: number;
+  trade_count: number;
+  candle_count: number | null;
+  equity_curve: EquityCurvePoint[];
+  trades: PerformanceTrade[];
+};
+
+export type IntelligenceProviderStatus = {
+  provider: "coingecko" | "fred" | "eia" | "finnhub";
+  configured: boolean;
+  available: boolean;
+  detail: string;
+};
+
+export type IntelligenceMetric = {
+  key: string;
+  label: string;
+  value: number;
+  unit: string | null;
+  change_percent: number | null;
+  as_of: string | null;
+  source: "coingecko" | "fred" | "eia";
+  url: string | null;
+};
+
+export type IntelligenceHeadline = {
+  title: string;
+  source: string;
+  url: string;
+  published_at: string | null;
+  category: string;
+};
+
+export type IntelligenceSnapshotResponse = {
+  generated_at: string;
+  focus_symbol: string;
+  focus_timeframe: string;
+  status: "ready" | "partial" | "unavailable";
+  summary: string;
+  providers: IntelligenceProviderStatus[];
+  crypto: IntelligenceMetric[];
+  macro: IntelligenceMetric[];
+  energy: IntelligenceMetric[];
+  headlines: IntelligenceHeadline[];
+  warnings: string[];
 };
 
 export const fallbackRuntimeSnapshot: RuntimeSnapshot = {
@@ -303,6 +494,14 @@ export const fallbackExecutionStatus: ExecutionStatusResponse = {
   engine_status: "paused",
   execution_mode: "paper",
   adapter: "freqtrade_mock",
+  adapter_runtime: {
+    configured: true,
+    status: "mock",
+    detail: "Execution runtime unavailable. Local fallback adapter metadata is active.",
+    last_checked_at: null,
+    last_error: null,
+    endpoint: null,
+  },
   starting_balance: 10000,
   cash_balance: 10000,
   equity_estimate: 10000,
@@ -339,9 +538,12 @@ export const fallbackStrategyStatus: StrategyFactoryStatusResponse = {
   latest_artifact: null,
   generation: {
     status: "idle",
+    phase: "idle",
     symbol: null,
     timeframe: null,
     run_id: null,
+    active_provider: null,
+    provider_label: null,
     artifact_directory: null,
     started_at: null,
     updated_at: null,
@@ -350,7 +552,49 @@ export const fallbackStrategyStatus: StrategyFactoryStatusResponse = {
     stdout_path: null,
     stderr_path: null,
     run_meta_path: null,
+    logs: [],
+    artifacts: [],
   },
+  providers: [],
+};
+
+export const fallbackAgentRuntime: AgentRuntimeSummaryResponse = {
+  generated_at: new Date().toISOString(),
+  strategy_factory_enabled: false,
+  configured_provider: "mock_rdq",
+  effective_provider: "mock_rdq",
+  agents: [],
+};
+
+export const fallbackPerformanceReport: PerformanceReport = {
+  mode: "paper",
+  symbol: null,
+  timeframe: null,
+  source: null,
+  strategy: null,
+  starting_balance: 10000,
+  ending_balance: 10000,
+  total_return: 0,
+  max_drawdown: 0,
+  win_rate: 0,
+  trade_count: 0,
+  candle_count: 0,
+  equity_curve: [],
+  trades: [],
+};
+
+export const fallbackIntelligenceSnapshot: IntelligenceSnapshotResponse = {
+  generated_at: new Date().toISOString(),
+  focus_symbol: "BTC/USDT",
+  focus_timeframe: "1m",
+  status: "unavailable",
+  summary: "External intelligence is unavailable.",
+  providers: [],
+  crypto: [],
+  macro: [],
+  energy: [],
+  headlines: [],
+  warnings: [],
 };
 
 function normalizeMarketSnapshotResponse(
@@ -384,6 +628,7 @@ function normalizeStrategyStatusResponse(
       ...fallbackStrategyStatus.generation,
       ...(payload?.generation ?? {}),
     },
+    providers: Array.isArray(payload?.providers) ? payload.providers : [],
   };
 }
 
@@ -480,6 +725,50 @@ export async function loadStrategyStatus(): Promise<StrategyFactoryStatusRespons
   } catch {
     return fallbackStrategyStatus;
   }
+}
+
+export async function loadAgentRuntime(): Promise<AgentRuntimeSummaryResponse> {
+  try {
+    return await requestJson<AgentRuntimeSummaryResponse>("/api/agents/runtime");
+  } catch {
+    return fallbackAgentRuntime;
+  }
+}
+
+export async function loadPaperPerformance(): Promise<PerformanceReport> {
+  try {
+    return await requestJson<PerformanceReport>("/api/performance/paper");
+  } catch {
+    return fallbackPerformanceReport;
+  }
+}
+
+export async function loadIntelligenceSnapshot(params: {
+  symbol: string;
+  timeframe: string;
+}): Promise<IntelligenceSnapshotResponse> {
+  const search = new URLSearchParams(params);
+  try {
+    return await requestJson<IntelligenceSnapshotResponse>(
+      `/api/intelligence/macro?${search.toString()}`,
+    );
+  } catch {
+    return {
+      ...fallbackIntelligenceSnapshot,
+      focus_symbol: params.symbol,
+      focus_timeframe: params.timeframe,
+    };
+  }
+}
+
+export async function runBacktest(payload: {
+  symbol?: string;
+  timeframe?: string;
+}): Promise<PerformanceReport> {
+  return requestJson<PerformanceReport>("/api/backtest/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function loadStrategyArtifacts(params?: {

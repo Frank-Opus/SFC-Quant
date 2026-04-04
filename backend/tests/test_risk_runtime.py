@@ -14,11 +14,13 @@ from app.services.risk import LIVE_MODE_CONFIRMATION
 def configure_risk_env(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("APP_MODE", "mock")
     monkeypatch.setenv("AI_PROVIDER", "mock")
+    monkeypatch.setenv("MARKET_DATA_MODE", "mock")
     monkeypatch.setenv("MARKET_SYMBOLS", "BTC/USDT")
     monkeypatch.setenv("MARKET_TIMEFRAMES", "1m")
     monkeypatch.setenv("MARKET_HISTORY_LIMIT", "4")
     monkeypatch.setenv("MARKET_STREAM_ENABLED", "false")
     monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path / "events"))
+    monkeypatch.setenv("EXECUTION_ADAPTER", "freqtrade_mock")
     monkeypatch.setenv("EXECUTION_PAPER_STARTING_BALANCE", "10000")
     monkeypatch.setenv("EXECUTION_ORDER_NOTIONAL_USD", "500")
     monkeypatch.setenv("RISK_MAX_POSITION_NOTIONAL_USD", "1000")

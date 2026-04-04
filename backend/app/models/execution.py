@@ -9,6 +9,7 @@ ExecutionAction = Literal["pause", "resume"]
 ExecutionEngineStatus = Literal["running", "paused"]
 ExecutionOrderSide = Literal["buy", "sell"]
 ExecutionOrderStatus = Literal["created", "submitted", "filled", "skipped", "blocked"]
+ExecutionAdapterConnectivityState = Literal["mock", "connected", "degraded", "offline"]
 
 
 class ExecutionControlRequest(BaseModel):
@@ -35,6 +36,8 @@ class ExecutionOrder(BaseModel):
     fill_value: float | None = None
     fee_paid: float = 0.0
     adapter: str
+    adapter_trade_id: str | None = None
+    adapter_detail: str | None = None
     created_at: datetime
     filled_at: datetime | None = None
     rationale_summary: str
@@ -46,13 +49,24 @@ class PaperPosition(BaseModel):
     avg_entry_price: float
     market_price: float
     unrealized_pnl: float
+    adapter_trade_id: str | None = None
     updated_at: datetime
+
+
+class ExecutionAdapterRuntime(BaseModel):
+    configured: bool
+    status: ExecutionAdapterConnectivityState
+    detail: str
+    last_checked_at: datetime | None = None
+    last_error: str | None = None
+    endpoint: str | None = None
 
 
 class ExecutionStatusResponse(BaseModel):
     engine_status: ExecutionEngineStatus
     execution_mode: str
     adapter: str
+    adapter_runtime: ExecutionAdapterRuntime
     starting_balance: float
     cash_balance: float
     equity_estimate: float

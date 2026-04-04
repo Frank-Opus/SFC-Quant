@@ -5,30 +5,42 @@ import {
   controlExecution,
   controlRiskHalt,
   dispatchExecution,
+  fallbackAgentRuntime,
   fallbackExecutionStatus,
   fallbackMarketSnapshot,
+  fallbackPerformanceReport,
   fallbackRiskStatus,
   fallbackStrategyStatus,
   generateStrategyArtifact,
+  loadAgentRuntime,
   loadExecutionStatus,
   loadLatestAnalysis,
   loadMarketSnapshot,
+  loadPaperPerformance,
   loadRiskStatus,
   loadStrategyArtifacts,
   loadStrategyStatus,
   requestLiveMode,
   resolveBackendWsUrl,
   runAnalysis,
+  runBacktest,
   updateStrategyConfig,
+  type AgentRuntimeSummaryResponse,
   type AnalysisRunResult,
   type EventEnvelope,
   type ExecutionStatusResponse,
   type MarketSnapshot,
   type MarketSnapshotResponse,
+  type PerformanceReport,
   type RiskStatusResponse,
   type StrategyArtifact,
   type StrategyFactoryStatusResponse,
 } from "../lib/market";
+import {
+  fallbackWorkflowSnapshot,
+  loadWorkflowSnapshot,
+  type WorkflowSnapshot,
+} from "../lib/workflow";
 
 type ConnectionStatus = "connecting" | "live" | "reconnecting" | "degraded" | "closed";
 
@@ -43,7 +55,11 @@ type MarketRuntimeState = {
   risk: RiskStatusResponse;
   strategyStatus: StrategyFactoryStatusResponse;
   strategyArtifacts: StrategyArtifact[];
+  agentRuntime: AgentRuntimeSummaryResponse;
+  paperPerformance: PerformanceReport;
+  backtestReport: PerformanceReport | null;
   latestAnalysis: AnalysisRunResult | null;
+  workflow: WorkflowSnapshot;
   connectionStatus: ConnectionStatus;
   connectionMessage: string;
   eventFeed: EventEnvelope[];
@@ -64,6 +80,7 @@ type MarketRuntimeState = {
   requestLiveModeAction: (enable: boolean, confirmationText?: string) => Promise<void>;
   toggleStrategyFactoryAction: (enabled: boolean) => Promise<void>;
   generateStrategyAction: () => Promise<void>;
+  runBacktestAction: () => Promise<void>;
 };
 
 const DEFAULT_INSTRUMENT: InstrumentSelection = {
@@ -72,7 +89,21 @@ const DEFAULT_INSTRUMENT: InstrumentSelection = {
 };
 
 function clampEvents(events: EventEnvelope[]): EventEnvelope[] {
-  return events.slice(0, 24);
+  const seen = new Set<string>();
+  const unique: EventEnvelope[] = [];
+
+  for (const event of events) {
+    if (seen.has(event.event_id)) {
+      continue;
+    }
+    seen.add(event.event_id);
+    unique.push(event);
+    if (unique.length >= 24) {
+      break;
+    }
+  }
+
+  return unique;
 }
 
 function upsertSnapshot(
@@ -127,7 +158,13 @@ export function useMarketRuntime(): MarketRuntimeState {
   const [strategyStatus, setStrategyStatus] =
     useState<StrategyFactoryStatusResponse>(fallbackStrategyStatus);
   const [strategyArtifacts, setStrategyArtifacts] = useState<StrategyArtifact[]>([]);
+  const [agentRuntime, setAgentRuntime] =
+    useState<AgentRuntimeSummaryResponse>(fallbackAgentRuntime);
+  const [paperPerformance, setPaperPerformance] =
+    useState<PerformanceReport>(fallbackPerformanceReport);
+  const [backtestReport, setBacktestReport] = useState<PerformanceReport | null>(null);
   const [latestAnalysis, setLatestAnalysis] = useState<AnalysisRunResult | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowSnapshot>(fallbackWorkflowSnapshot);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [connectionMessage, setConnectionMessage] = useState(t("runtime.connecting"));
   const [eventFeed, setEventFeed] = useState<EventEnvelope[]>(fallbackMarketSnapshot.recent_events);
@@ -181,6 +218,37 @@ export function useMarketRuntime(): MarketRuntimeState {
     setStrategyArtifacts(nextArtifacts);
   }, []);
 
+  const refreshAgentRuntime = useCallback(async () => {
+    const next = await loadAgentRuntime();
+    if (!activeRef.current) {
+      return;
+    }
+    setAgentRuntime(next);
+  }, []);
+
+  const refreshPaperPerformance = useCallback(async () => {
+    const next = await loadPaperPerformance();
+    if (!activeRef.current) {
+      return;
+    }
+    setPaperPerformance(next);
+  }, []);
+
+  const refreshBacktest = useCallback(async (selection: InstrumentSelection) => {
+    try {
+      const next = await runBacktest(selection);
+      if (!activeRef.current) {
+        return;
+      }
+      setBacktestReport(next);
+    } catch {
+      if (!activeRef.current) {
+        return;
+      }
+      setBacktestReport(null);
+    }
+  }, []);
+
   const refreshAnalysis = useCallback(async (selection: InstrumentSelection) => {
     const next = await loadLatestAnalysis(selection);
     if (!activeRef.current) {
@@ -189,12 +257,29 @@ export function useMarketRuntime(): MarketRuntimeState {
     setLatestAnalysis(next);
   }, []);
 
+  const refreshWorkflow = useCallback(async (selection: InstrumentSelection) => {
+    const next = await loadWorkflowSnapshot(selection);
+    if (!activeRef.current) {
+      return;
+    }
+    setWorkflow(next);
+  }, []);
+
   const refreshAll = useCallback(async () => {
-    const [nextSnapshot, nextExecution, nextRisk, nextStrategyStatus] = await Promise.all([
+    const [
+      nextSnapshot,
+      nextExecution,
+      nextRisk,
+      nextStrategyStatus,
+      nextAgentRuntime,
+      nextPaperPerformance,
+    ] = await Promise.all([
       loadMarketSnapshot(),
       loadExecutionStatus(),
       loadRiskStatus(),
       loadStrategyStatus(),
+      loadAgentRuntime(),
+      loadPaperPerformance(),
     ]);
 
     if (!activeRef.current) {
@@ -210,22 +295,28 @@ export function useMarketRuntime(): MarketRuntimeState {
     setExecution(nextExecution);
     setRisk(nextRisk);
     setStrategyStatus(nextStrategyStatus);
+    setAgentRuntime(nextAgentRuntime);
+    setPaperPerformance(nextPaperPerformance);
     setEventFeed(clampEvents(nextSnapshot.recent_events));
     setSelectedInstrumentState(resolvedInstrument);
 
-    const [nextAnalysis, nextStrategyArtifacts] = await Promise.all([
+    const [nextAnalysis, nextStrategyArtifacts, nextBacktest, nextWorkflow] = await Promise.all([
       loadLatestAnalysis(resolvedInstrument),
       loadStrategyArtifacts({
         symbol: resolvedInstrument.symbol,
         timeframe: resolvedInstrument.timeframe,
         limit: 6,
       }),
+      runBacktest(resolvedInstrument).catch(() => null),
+      loadWorkflowSnapshot(resolvedInstrument),
     ]);
     if (!activeRef.current) {
       return;
     }
     setLatestAnalysis(nextAnalysis);
     setStrategyArtifacts(nextStrategyArtifacts);
+    setBacktestReport(nextBacktest);
+    setWorkflow(nextWorkflow);
   }, []);
 
   const setSelectedInstrument = useCallback((selection: InstrumentSelection) => {
@@ -237,8 +328,16 @@ export function useMarketRuntime(): MarketRuntimeState {
   }, [refreshAnalysis, selectedInstrument]);
 
   useEffect(() => {
+    void refreshWorkflow(selectedInstrument);
+  }, [refreshWorkflow, selectedInstrument]);
+
+  useEffect(() => {
     void refreshStrategy(selectedInstrument);
   }, [refreshStrategy, selectedInstrument]);
+
+  useEffect(() => {
+    void refreshBacktest(selectedInstrument);
+  }, [refreshBacktest, selectedInstrument]);
 
   useEffect(() => {
     activeRef.current = true;
@@ -296,6 +395,7 @@ export function useMarketRuntime(): MarketRuntimeState {
         const resolvedInstrument = resolveInstrument(payload, selectedInstrumentRef.current);
         setSnapshot(payload);
         setSelectedInstrumentState(resolvedInstrument);
+        void refreshWorkflow(resolvedInstrument);
         return;
       }
 
@@ -317,20 +417,26 @@ export function useMarketRuntime(): MarketRuntimeState {
           payload.timeframe === selectedInstrumentRef.current.timeframe
         ) {
           setLatestAnalysis(payload);
+          void refreshWorkflow(selectedInstrumentRef.current);
         }
         return;
       }
 
       if (isExecutionEvent(event.event_type)) {
         void refreshExecution();
+        void refreshPaperPerformance();
+        void refreshWorkflow(selectedInstrumentRef.current);
       }
 
       if (isRiskEvent(event.event_type)) {
         void refreshRisk();
+        void refreshWorkflow(selectedInstrumentRef.current);
       }
 
       if (isStrategyEvent(event.event_type)) {
         void refreshStrategy(selectedInstrumentRef.current);
+        void refreshAgentRuntime();
+        void refreshWorkflow(selectedInstrumentRef.current);
       }
     });
 
@@ -363,7 +469,15 @@ export function useMarketRuntime(): MarketRuntimeState {
         connect();
       }, delay);
     });
-  }, [refreshExecution, refreshRisk, t]);
+  }, [
+    refreshAgentRuntime,
+    refreshExecution,
+    refreshPaperPerformance,
+    refreshRisk,
+    refreshStrategy,
+    refreshWorkflow,
+    t,
+  ]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;
@@ -416,8 +530,9 @@ export function useMarketRuntime(): MarketRuntimeState {
           }),
         }),
       );
+      await refreshWorkflow(selectedInstrumentRef.current);
     });
-  }, [formatRecommendation, runAction, t]);
+  }, [formatRecommendation, refreshWorkflow, runAction, t]);
 
   const dispatchAction = useCallback(async () => {
     await runAction("dispatch", async () => {
@@ -428,9 +543,11 @@ export function useMarketRuntime(): MarketRuntimeState {
       setLatestAnalysis(result.analysis);
       setExecution(result.status);
       await refreshRisk();
+      await refreshPaperPerformance();
+      await refreshWorkflow(selectedInstrumentRef.current);
       setActionMessage(result.message);
     });
-  }, [refreshRisk, runAction]);
+  }, [refreshPaperPerformance, refreshRisk, refreshWorkflow, runAction]);
 
   const pauseExecutionAction = useCallback(async () => {
     await runAction("pause", async () => {
@@ -443,8 +560,9 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
       setExecution(result);
       setActionMessage(result.paused_reason ?? t("runtime.executionPaused"));
+      await refreshWorkflow(selectedInstrumentRef.current);
     });
-  }, [runAction, t]);
+  }, [refreshWorkflow, runAction, t]);
 
   const resumeExecutionAction = useCallback(async () => {
     await runAction("resume", async () => {
@@ -454,8 +572,9 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
       setExecution(result);
       setActionMessage(t("runtime.executionResumed"));
+      await refreshWorkflow(selectedInstrumentRef.current);
     });
-  }, [runAction, t]);
+  }, [refreshWorkflow, runAction, t]);
 
   const engageRiskHaltAction = useCallback(async () => {
     await runAction("halt", async () => {
@@ -469,8 +588,9 @@ export function useMarketRuntime(): MarketRuntimeState {
       setRisk(result);
       await refreshExecution();
       setActionMessage(result.halt_reason ?? t("runtime.haltEngaged"));
+      await refreshWorkflow(selectedInstrumentRef.current);
     });
-  }, [refreshExecution, runAction, t]);
+  }, [refreshExecution, refreshWorkflow, runAction, t]);
 
   const clearRiskHaltAction = useCallback(async () => {
     await runAction("clear-halt", async () => {
@@ -480,8 +600,9 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
       setRisk(result);
       setActionMessage(t("runtime.haltCleared"));
+      await refreshWorkflow(selectedInstrumentRef.current);
     });
-  }, [runAction, t]);
+  }, [refreshWorkflow, runAction, t]);
 
   const requestLiveModeAction = useCallback(
     async (enable: boolean, confirmationText?: string) => {
@@ -498,9 +619,10 @@ export function useMarketRuntime(): MarketRuntimeState {
           result.live_mode_reason ??
             (enable ? t("runtime.liveModeUpdated") : t("runtime.liveModeDisabled")),
         );
+        await refreshWorkflow(selectedInstrumentRef.current);
       });
     },
-    [runAction, t],
+    [refreshWorkflow, runAction, t],
   );
 
   const toggleStrategyFactoryAction = useCallback(
@@ -512,10 +634,12 @@ export function useMarketRuntime(): MarketRuntimeState {
         }
         setStrategyStatus(result);
         await refreshStrategy(selectedInstrumentRef.current);
+        await refreshAgentRuntime();
+        await refreshWorkflow(selectedInstrumentRef.current);
         setActionMessage(result.reason ?? t("runtime.strategyUpdated"));
       });
     },
-    [refreshStrategy, runAction, t],
+    [refreshAgentRuntime, refreshStrategy, refreshWorkflow, runAction, t],
   );
 
   const generateStrategyAction = useCallback(async () => {
@@ -526,9 +650,24 @@ export function useMarketRuntime(): MarketRuntimeState {
       }
       setStrategyStatus(result.status);
       await refreshStrategy(selectedInstrumentRef.current);
+      await refreshAgentRuntime();
+      await refreshWorkflow(selectedInstrumentRef.current);
       setActionMessage(result.message);
     });
-  }, [refreshStrategy, runAction]);
+  }, [refreshAgentRuntime, refreshStrategy, refreshWorkflow, runAction]);
+
+  const runBacktestAction = useCallback(async () => {
+    await runAction("backtest-run", async () => {
+      const result = await runBacktest(selectedInstrumentRef.current);
+      if (!activeRef.current) {
+        return;
+      }
+      setBacktestReport(result);
+      setActionMessage(
+        `${result.symbol ?? selectedInstrumentRef.current.symbol} ${result.timeframe ?? selectedInstrumentRef.current.timeframe} backtest ready.`,
+      );
+    });
+  }, [runAction]);
 
   return useMemo(
     () => ({
@@ -537,7 +676,11 @@ export function useMarketRuntime(): MarketRuntimeState {
       risk,
       strategyStatus,
       strategyArtifacts,
+      agentRuntime,
+      paperPerformance,
+      backtestReport,
       latestAnalysis,
+      workflow,
       connectionStatus,
       connectionMessage,
       eventFeed,
@@ -558,9 +701,12 @@ export function useMarketRuntime(): MarketRuntimeState {
       requestLiveModeAction,
       toggleStrategyFactoryAction,
       generateStrategyAction,
+      runBacktestAction,
     }),
     [
       actionMessage,
+      agentRuntime,
+      backtestReport,
       clearRiskHaltAction,
       connectionMessage,
       connectionStatus,
@@ -573,6 +719,7 @@ export function useMarketRuntime(): MarketRuntimeState {
       latestAnalysis,
       pauseExecutionAction,
       pendingAction,
+      paperPerformance,
       reconnect,
       reconnectAttempts,
       refreshAll,
@@ -586,6 +733,8 @@ export function useMarketRuntime(): MarketRuntimeState {
       strategyArtifacts,
       strategyStatus,
       toggleStrategyFactoryAction,
+      runBacktestAction,
+      workflow,
     ],
   );
 }

@@ -53,7 +53,12 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
         </Badge>
       </div>
 
-      <p className="quiet-copy">{thesis?.summary ?? macroRole.summary}</p>
+      <p
+        className="quiet-copy clamp-3 copy-break"
+        title={thesis?.summary ?? macroRole.summary}
+      >
+        {thesis?.summary ?? macroRole.summary}
+      </p>
 
       {thesis ? (
         <div className="macro-regime-row">
@@ -81,7 +86,9 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
                   <span className="event-type">{item.label}</span>
                   <span>{item.horizon}</span>
                 </div>
-                <p>{item.detail}</p>
+                <p className="clamp-3 copy-break" title={item.detail}>
+                  {item.detail}
+                </p>
               </article>
             ))}
             {thesis?.catalysts.length ? null : (
@@ -91,7 +98,9 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
                     <span className="event-type">{item.label}</span>
                     <span>{item.kind}</span>
                   </div>
-                  <p>{item.detail}</p>
+                  <p className="clamp-3 copy-break" title={item.detail}>
+                    {item.detail}
+                  </p>
                 </article>
               ))
             )}
@@ -110,8 +119,12 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
                   <span className="event-type">{item.label}</span>
                   <span>{t("macro.watch")}</span>
                 </div>
-                <p>{item.trigger}</p>
-                <small>{item.implication}</small>
+                <p className="clamp-2 copy-break" title={item.trigger}>
+                  {item.trigger}
+                </p>
+                <small className="clamp-2 copy-break" title={item.implication}>
+                  {item.implication}
+                </small>
               </article>
             ))}
           </div>
@@ -128,8 +141,14 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
             <article className="source-row" key={`${source.title}-${source.url ?? source.note ?? "note"}`}>
               <div>
                 <span className="section-label">{source.kind}</span>
-                <strong>{source.title}</strong>
-                {source.note ? <p>{source.note}</p> : null}
+                <strong className="clamp-2 copy-break" title={source.title}>
+                  {source.title}
+                </strong>
+                {source.note ? (
+                  <p className="clamp-2 copy-break" title={source.note}>
+                    {source.note}
+                  </p>
+                ) : null}
               </div>
               {source.url ? (
                 <a href={source.url} target="_blank" rel="noreferrer" className="source-link">

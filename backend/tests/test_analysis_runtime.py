@@ -16,6 +16,7 @@ from app.services.providers import (
 
 def configure_analysis_env(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("APP_MODE", "mock")
+    monkeypatch.setenv("MARKET_DATA_MODE", "mock")
     monkeypatch.setenv("MARKET_SYMBOLS", "BTC/USDT")
     monkeypatch.setenv("MARKET_TIMEFRAMES", "1m")
     monkeypatch.setenv("MARKET_HISTORY_LIMIT", "4")
