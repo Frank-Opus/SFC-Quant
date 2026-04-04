@@ -1,0 +1,5 @@
+  codex/live-readiness-plan           a757d1b feat: add static preview runtime fallback
++ codex/terminal-dashboard-impeccable 97d7e55 (/Users/suhui/.config/superpowers/worktrees/dSFC-Quant/terminal-dashboard-impeccable) docs: start milestone v1.1 bilingual live market readiness
+  codex/v1-archive-provider-ship      50d5ea1 [origin/codex/v1-archive-provider-ship: ahead 3] Release harden SFC-Quant terminal workspace
+* main                                8bfadf4 [origin/main] Merge branch 'codex/live-readiness-plan'
+  master                              acdc20c [origin/master] feat: add static preview runtime fallback

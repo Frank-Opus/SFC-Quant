@@ -1,0 +1,26 @@
+{
+  "name": "dSFC-Quant",
+  "service": "backend",
+  "status": "ok",
+  "app_env": "development",
+  "app_mode": "mock",
+  "runtime_mode": "mock-safe",
+  "ai_provider": "openai_compatible",
+  "ai_model": "gpt-5.4",
+  "exchange_id": "binance",
+  "execution_mode": "paper",
+  "execution_adapter": "freqtrade_mock",
+  "ai_credentials_present": true,
+  "exchange_credentials_present": false,
+  "live_trading_requested": false,
+  "live_trading_enabled": false,
+  "market_data": {
+    "mode": "real",
+    "requested_source": "ccxt",
+    "effective_source": "ccxt",
+    "status": "live",
+    "fallback_active": false,
+    "detail": "Real market data is active via ccxt."
+  },
+  "warnings": []
+}

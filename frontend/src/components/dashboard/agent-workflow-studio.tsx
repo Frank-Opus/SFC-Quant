@@ -6,13 +6,13 @@ import {
   Bot,
   BrainCircuit,
   Cable,
-  ChevronRight,
-  ClipboardList,
   FlaskConical,
   LineChart,
+  PanelRightOpen,
+  PanelRightClose,
   ShieldAlert,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import { useLocale } from "../../lib/i18n";
 import type {
@@ -59,6 +59,12 @@ type DetailView = {
   facts: string[];
 };
 
+type StatusTone = "stable" | "active" | "warning" | "danger";
+
+type StagePoint = { x: number; y: number };
+
+type RolePoint = StagePoint & { sprite: string };
+
 const STAGE_ORDER: WorkflowStageKey[] = [
   "market",
   "analysis",
@@ -75,6 +81,24 @@ const ROLE_ORDER: WorkflowRoleState["role"][] = [
   "risk_decision",
 ];
 
+const CORE_POINT: StagePoint = { x: 50, y: 50 };
+
+const STAGE_POINTS: Record<WorkflowStageKey, StagePoint> = {
+  market: { x: 18, y: 30 },
+  analysis: { x: 35, y: 30 },
+  strategy: { x: 65, y: 30 },
+  risk: { x: 82, y: 30 },
+  execution: { x: 38, y: 72 },
+  performance: { x: 68, y: 72 },
+};
+
+const ROLE_POINTS: Record<WorkflowRoleState["role"], RolePoint> = {
+  data: { x: 18, y: 80, sprite: "/star-office/guest_role_1.png" },
+  technical_analysis: { x: 37, y: 84, sprite: "/star-office/guest_role_2.png" },
+  news_geopolitics: { x: 63, y: 84, sprite: "/star-office/guest_role_3.png" },
+  risk_decision: { x: 82, y: 80, sprite: "/star-office/guest_role_4.png" },
+};
+
 function badgeColor(status: string): "green" | "amber" | "red" | "cyan" {
   if (["completed", "ready", "connected"].includes(status)) {
     return "green";
@@ -86,6 +110,19 @@ function badgeColor(status: string): "green" | "amber" | "red" | "cyan" {
     return "amber";
   }
   return "red";
+}
+
+function toneForStatus(status: string): StatusTone {
+  if (["completed", "ready", "connected"].includes(status)) {
+    return "stable";
+  }
+  if (["running", "active", "mock", "paper"].includes(status)) {
+    return "active";
+  }
+  if (["blocked", "degraded", "fallback", "timeout", "offline"].includes(status)) {
+    return "warning";
+  }
+  return "danger";
 }
 
 function stageIcon(key: WorkflowStageKey) {
@@ -142,6 +179,16 @@ function resolveStrategyPhaseLabel(t: (key: string) => string, phase: string): s
   return translated === key ? phase : translated;
 }
 
+function nodeStyle(point: StagePoint): CSSProperties {
+  return {
+    left: `${point.x}%`,
+    top: `${point.y}%`,
+    background: "none",
+    border: "none",
+    padding: 0,
+  };
+}
+
 export function AgentWorkflowStudio({
   workflow,
   agentRuntime,
@@ -156,6 +203,7 @@ export function AgentWorkflowStudio({
   const { t, formatDateTime, formatPercent, formatRecommendation, formatRole } = useLocale();
   const snapshot = workflow;
   const [selection, setSelection] = useState<StudioSelection>("core");
+  const [drawerOpen, setDrawerOpen] = useState(true);
 
   const roleMap = useMemo(
     () => new Map((snapshot?.roles ?? []).map((role) => [role.role, role])),
@@ -236,26 +284,41 @@ export function AgentWorkflowStudio({
       {
         id: "market",
         area: resolveStageLabel(t, snapshot.stages.market),
-        verdict: snapshot.effective_market_source === snapshot.requested_market_source ? t("workflowStudio.auditStrong") : t("workflowStudio.auditPartial"),
-        tone: snapshot.effective_market_source === snapshot.requested_market_source ? "green" : "amber",
+        verdict:
+          snapshot.effective_market_source === snapshot.requested_market_source
+            ? t("workflowStudio.auditStrong")
+            : t("workflowStudio.auditPartial"),
+        tone:
+          snapshot.effective_market_source === snapshot.requested_market_source
+            ? "green"
+            : "amber",
         reason: snapshot.stages.market.detail ?? t("workflow.noDetail"),
-        next: `${t("shell.overviewTitle")} / ${t("marketDeck.title")}`,
       },
       {
         id: "analysis",
         area: resolveStageLabel(t, snapshot.stages.analysis),
-        verdict: snapshot.roles.length >= 3 || Boolean(latestAnalysis) ? t("workflowStudio.auditStrong") : t("workflowStudio.auditPartial"),
-        tone: snapshot.roles.length >= 3 || Boolean(latestAnalysis) ? "green" : "amber",
-        reason: latestAnalysis?.outputs.at(-1)?.summary ?? snapshot.stages.analysis.detail ?? t("workflow.noDetail"),
-        next: t("thesis.title"),
+        verdict:
+          snapshot.roles.length >= 3 || Boolean(latestAnalysis)
+            ? t("workflowStudio.auditStrong")
+            : t("workflowStudio.auditPartial"),
+        tone:
+          snapshot.roles.length >= 3 || Boolean(latestAnalysis)
+            ? "green"
+            : "amber",
+        reason:
+          latestAnalysis?.outputs.at(-1)?.summary ??
+          snapshot.stages.analysis.detail ??
+          t("workflow.noDetail"),
       },
       {
         id: "strategy",
         area: resolveStageLabel(t, snapshot.stages.strategy),
-        verdict: strategyStatus.enabled || Boolean(effectiveProvider) ? t("workflowStudio.auditPartial") : t("workflowStudio.auditWeak"),
+        verdict:
+          strategyStatus.enabled || Boolean(effectiveProvider)
+            ? t("workflowStudio.auditPartial")
+            : t("workflowStudio.auditWeak"),
         tone: strategyStatus.enabled || Boolean(effectiveProvider) ? "amber" : "red",
         reason: snapshot.stages.strategy.detail ?? strategyStatus.reason ?? t("workflow.noDetail"),
-        next: t("extensions.title"),
       },
       {
         id: "risk",
@@ -263,23 +326,26 @@ export function AgentWorkflowStudio({
         verdict: paperLive ? t("workflowStudio.auditStrong") : t("workflowStudio.auditPartial"),
         tone: paperLive ? "green" : "amber",
         reason: snapshot.stages.risk.detail ?? t("workflow.noDetail"),
-        next: t("operator.title"),
       },
       {
         id: "execution",
         area: resolveStageLabel(t, snapshot.stages.execution),
-        verdict: execution.adapter_runtime.status === "offline" ? t("workflowStudio.auditWeak") : t("workflowStudio.auditStrong"),
+        verdict:
+          execution.adapter_runtime.status === "offline"
+            ? t("workflowStudio.auditWeak")
+            : t("workflowStudio.auditStrong"),
         tone: execution.adapter_runtime.status === "offline" ? "red" : "green",
         reason: `${execution.adapter_runtime.detail} · ${execution.recent_orders.length} orders / ${execution.positions.length} positions`,
-        next: t("operator.title"),
       },
       {
         id: "performance",
         area: resolveStageLabel(t, snapshot.stages.performance),
-        verdict: paperPerformance.trade_count > 0 || Boolean(backtestReport) ? t("workflowStudio.auditPartial") : t("workflowStudio.auditWeak"),
+        verdict:
+          paperPerformance.trade_count > 0 || Boolean(backtestReport)
+            ? t("workflowStudio.auditPartial")
+            : t("workflowStudio.auditWeak"),
         tone: paperPerformance.trade_count > 0 || Boolean(backtestReport) ? "amber" : "red",
         reason: `paper ${paperMetric}${backtestReport ? ` · backtest ${backtestMetric}` : ""}`,
-        next: t("analytics.title"),
       },
     ] as const;
   }, [
@@ -299,58 +365,6 @@ export function AgentWorkflowStudio({
     t,
   ]);
 
-  const evaluationDashboardItems = useMemo(
-    () => [
-      {
-        where: t("shell.overviewTitle"),
-        check: `${t("runtime.marketRequested")} / ${t("runtime.marketEffective")} / ${t("hero.execution")}`,
-      },
-      {
-        where: t("thesis.title"),
-        check: `${t("agentOps.recommendation")} / ${t("agentOps.confidence")} / ${t("workflow.roles")}`,
-      },
-      {
-        where: t("extensions.title"),
-        check: `${t("workflow.providers")} / ${t("strategy.recent")} / ${t("strategy.generation")}`,
-      },
-      {
-        where: t("operator.title"),
-        check: `${t("operator.runAnalysis")} / ${t("operator.dispatchPaper")} / ${t("hero.halt")}`,
-      },
-      {
-        where: t("analytics.title"),
-        check: `${t("performance.title")} / ${t("analytics.signalLog.title")} / ${t("analytics.factorRadar.title")}`,
-      },
-      {
-        where: t("diagnostics.title"),
-        check: `${t("diagnostics.warnings", { count: 0 })} / ${t("runtime.marketDetail")} / ${t("diagnostics.retries")}`,
-      },
-    ],
-    [t],
-  );
-
-  const evaluationCliItems = useMemo(
-    () => [
-      {
-        command: "cd frontend && npm run build",
-        expectation: "Frontend production build completes without runtime/type errors.",
-      },
-      {
-        command: "cd frontend && npm run e2e:release",
-        expectation: "Release walkthrough and layout regression checks pass end-to-end.",
-      },
-      {
-        command: "cd backend && pytest tests/test_workflow_runtime.py tests/test_performance_runtime.py tests/test_health.py",
-        expectation: "Workflow snapshot, performance API, and health endpoints stay green.",
-      },
-      {
-        command: "docker compose up backend frontend",
-        expectation: "Local operator stack boots with two primary services and the dashboard is reachable.",
-      },
-    ],
-    [],
-  );
-
   const detailView = useMemo<DetailView | null>(() => {
     if (!snapshot) {
       return null;
@@ -366,7 +380,10 @@ export function AgentWorkflowStudio({
         detail: snapshot.current_handoff ?? t("workflow.noHandoff"),
         meta: [
           { label: t("workflow.currentRun"), value: snapshot.current_run_id ?? t("workflow.noRun") },
-          { label: t("workflow.marketRoute"), value: `${snapshot.requested_market_source.toUpperCase()} -> ${snapshot.effective_market_source.toUpperCase()}` },
+          {
+            label: t("workflow.marketRoute"),
+            value: `${snapshot.requested_market_source.toUpperCase()} -> ${snapshot.effective_market_source.toUpperCase()}`,
+          },
           { label: t("workflow.executionAdapter"), value: snapshot.execution_adapter },
           { label: t("agentOps.provider"), value: effectiveProvider?.label ?? t("workflow.noProviders") },
         ],
@@ -393,7 +410,10 @@ export function AgentWorkflowStudio({
           { label: t("agentOps.provider"), value: stage.actor ?? "-" },
           { label: t("workflow.executionAdapter"), value: snapshot.execution_adapter },
         ],
-        facts: stage.facts.length > 0 ? stage.facts.map((fact) => `${fact.label}: ${fact.value}`) : [t("workflow.noDetail")],
+        facts:
+          stage.facts.length > 0
+            ? stage.facts.map((fact) => `${fact.label}: ${fact.value}`)
+            : [t("workflow.noDetail")],
       };
     }
 
@@ -411,7 +431,10 @@ export function AgentWorkflowStudio({
         meta: [
           { label: t("agentOps.provider"), value: role.provider },
           { label: t("agentOps.model"), value: role.model },
-          { label: t("agentOps.recommendation"), value: formatRecommendation(role.recommendation, { uppercase: true }) },
+          {
+            label: t("agentOps.recommendation"),
+            value: formatRecommendation(role.recommendation, { uppercase: true }),
+          },
           { label: t("agentOps.confidence"), value: formatPercent(role.confidence * 100, false) },
         ],
         facts: [
@@ -421,7 +444,9 @@ export function AgentWorkflowStudio({
       };
     }
 
-    const provider = providerMap.get(selectedId.replace("provider:", "") as WorkflowProviderState["provider"]);
+    const provider = providerMap.get(
+      selectedId.replace("provider:", "") as WorkflowProviderState["provider"],
+    );
     if (!provider) {
       return null;
     }
@@ -436,7 +461,10 @@ export function AgentWorkflowStudio({
       meta: [
         { label: t("agentOps.phase"), value: resolveStrategyPhaseLabel(t, provider.phase) },
         { label: t("workflow.effective"), value: provider.effective ? t("strategy.current") : "-" },
-        { label: t("workflow.providerArtifacts", { count: provider.artifact_count }), value: `${provider.artifact_count}` },
+        {
+          label: t("workflow.providerArtifacts", { count: provider.artifact_count }),
+          value: `${provider.artifact_count}`,
+        },
         { label: t("workflowStudio.command"), value: provider.command ?? "-" },
       ],
       facts: [
@@ -490,302 +518,345 @@ export function AgentWorkflowStudio({
         {summaryTiles.map((tile) => (
           <article className="workflow-command-summary-item" key={tile.id}>
             <span>{tile.label}</span>
-            <strong className="token-ellipsis" title={tile.value}>{tile.value}</strong>
+            <strong className="token-ellipsis" title={tile.value}>
+              {tile.value}
+            </strong>
           </article>
         ))}
       </div>
 
-      <div className="workflow-command-deck">
-        <section className="workflow-command-card workflow-command-card--map">
-          <div className="workflow-command-card-head">
-            <div>
-              <span className="section-label">{t("workflowStudio.graphTitle")}</span>
-              <h4>{t("workflowStudio.graphDescription")}</h4>
+      <div className="workflow-star-shell" data-drawer-open={drawerOpen}>
+        <div className="workflow-star-main">
+          <section className="workflow-star-stage-shell">
+            <div className="workflow-star-stage-toolbar">
+              <div>
+                <span className="section-label">{t("workflowStudio.theater")}</span>
+                <strong>{t("workflowStudio.graphDescription")}</strong>
+              </div>
+              <button
+                type="button"
+                className="workflow-star-toggle"
+                onClick={() => setDrawerOpen((current) => !current)}
+                aria-expanded={drawerOpen}
+              >
+                {drawerOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+                <span>
+                  {drawerOpen ? t("workflowStudio.closeInspector") : t("workflowStudio.openInspector")}
+                </span>
+              </button>
             </div>
-            <Badge color={badgeColor(snapshot.stages[activeStageKey].status)}>
-              {resolveStageLabel(t, snapshot.stages[activeStageKey])}
-            </Badge>
-          </div>
 
-          <div className="workflow-command-stage-track" data-testid="workflow-star-stage">
-            {STAGE_ORDER.map((key, index) => {
-              const stage = snapshot.stages[key];
-              const Icon = stageIcon(key);
-              const active = selectedId === `stage:${key}`;
-              return (
-                <div className="workflow-command-stage-unit" key={key}>
+            <div className="workflow-star-stage" data-testid="workflow-star-stage">
+              <img className="workflow-star-background" src="/star-office/office_bg_small.webp" alt="" />
+              <div className="workflow-star-noise" aria-hidden="true" />
+              <img className="workflow-star-guide" src="/star-office/star-idle-v5.png" alt="" />
+
+              <svg
+                className="workflow-star-links"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <line x1="18" y1="30" x2="35" y2="30" data-active={activeStageKey === "market" || activeStageKey === "analysis"} />
+                <line x1="35" y1="30" x2="65" y2="30" data-active={activeStageKey === "analysis" || activeStageKey === "strategy"} />
+                <line x1="65" y1="30" x2="82" y2="30" data-active={activeStageKey === "strategy" || activeStageKey === "risk"} />
+                <line x1="82" y1="30" x2="38" y2="72" data-active={activeStageKey === "risk" || activeStageKey === "execution"} />
+                <line x1="38" y1="72" x2="68" y2="72" data-active={activeStageKey === "execution" || activeStageKey === "performance"} />
+                <line x1="35" y1="30" x2="50" y2="50" data-active={activeStageKey === "analysis"} />
+                <line x1="50" y1="50" x2="82" y2="30" data-active={activeStageKey === "risk"} />
+                <line x1="18" y1="80" x2="35" y2="30" data-active={selectedId === "role:data"} />
+                <line x1="37" y1="84" x2="35" y2="30" data-active={selectedId === "role:technical_analysis"} />
+                <line x1="63" y1="84" x2="35" y2="30" data-active={selectedId === "role:news_geopolitics"} />
+                <line x1="82" y1="80" x2="82" y2="30" data-active={selectedId === "role:risk_decision"} />
+              </svg>
+
+              <div className="workflow-star-plaque">
+                <span>{t("workflowStudio.activeTicker")}</span>
+                <strong>{snapshot.current_handoff ?? t("workflow.noHandoff")}</strong>
+                <span>{t("workflow.updatedAt", { time: formatDateTime(snapshot.generated_at) })}</span>
+              </div>
+
+              <motion.button
+                type="button"
+                className="workflow-star-node"
+                data-active={selectedId === "core"}
+                data-tone={toneForStatus(snapshot.stages[activeStageKey].status)}
+                onClick={() => setSelection("core")}
+                style={nodeStyle(CORE_POINT)}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.22 }}
+              >
+                <span className="workflow-star-avatar" data-core="true">
+                  <img src="/branding/sfc-mark.png" alt="SFC-Quant core" />
+                </span>
+                <span className="workflow-star-nameplate">
+                  <span className="workflow-star-status-dot" data-tone={toneForStatus(snapshot.stages[activeStageKey].status)} />
+                  <span className="workflow-star-nameplate-copy">
+                    <span>{t("workflowStudio.core")}</span>
+                    <strong>{resolveStageLabel(t, snapshot.stages[activeStageKey])}</strong>
+                  </span>
+                </span>
+              </motion.button>
+
+              {STAGE_ORDER.map((key, index) => {
+                const stage = snapshot.stages[key];
+                const Icon = stageIcon(key);
+                return (
                   <motion.button
                     type="button"
-                    className="workflow-command-stage-card"
-                    data-active={active}
-                    data-status={stage.status}
+                    className="workflow-star-node"
+                    key={key}
+                    data-active={selectedId === `stage:${key}`}
+                    data-tone={toneForStatus(stage.status)}
                     onClick={() => setSelection(`stage:${key}`)}
-                    initial={{ opacity: 0, y: 10 }}
+                    style={nodeStyle(STAGE_POINTS[key])}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2, delay: index * 0.04 }}
+                    transition={{ duration: 0.22, delay: index * 0.04 }}
                   >
-                    <div className="workflow-command-stage-topline">
-                      <span className="workflow-command-stage-icon">
-                        <Icon size={16} />
+                    <span className="workflow-star-avatar">
+                      <Icon size={18} />
+                    </span>
+                    <span className="workflow-star-nameplate">
+                      <span className="workflow-star-status-dot" data-tone={toneForStatus(stage.status)} />
+                      <span className="workflow-star-nameplate-copy">
+                        <span>{resolveStageLabel(t, stage)}</span>
+                        <strong>{stage.actor ?? resolveStatusLabel(t, stage.status)}</strong>
                       </span>
-                      <Badge color={badgeColor(stage.status)}>{resolveStatusLabel(t, stage.status)}</Badge>
-                    </div>
-                    <span className="section-label">{resolveStageLabel(t, stage)}</span>
-                    <strong>{stage.actor ?? resolveStatusLabel(t, stage.status)}</strong>
-                    <p className="clamp-3 copy-break" title={stage.detail ?? t("workflow.noDetail")}>
-                      {stage.detail ?? t("workflow.noDetail")}
-                    </p>
+                    </span>
                   </motion.button>
-                  {index < STAGE_ORDER.length - 1 ? (
-                    <div className="workflow-command-stage-arrow" aria-hidden="true">
-                      <ChevronRight size={16} />
-                    </div>
-                  ) : null}
+                );
+              })}
+
+              {ROLE_ORDER.map((roleKey, index) => {
+                const role = roleMap.get(roleKey);
+                const position = ROLE_POINTS[roleKey];
+                return (
+                  <motion.button
+                    type="button"
+                    className="workflow-star-node"
+                    data-testid="workflow-role-node"
+                    data-kind="persona"
+                    data-active={selectedId === `role:${roleKey}`}
+                    data-tone={toneForStatus(role?.status ?? "idle")}
+                    key={roleKey}
+                    onClick={() => setSelection(`role:${roleKey}`)}
+                    style={nodeStyle(position)}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, delay: 0.22 + index * 0.04 }}
+                  >
+                    <span className="workflow-star-avatar" data-kind="persona">
+                      <img src={position.sprite} alt={formatRole(roleKey)} />
+                    </span>
+                    <span className="workflow-star-nameplate">
+                      <span className="workflow-star-status-dot" data-tone={toneForStatus(role?.status ?? "idle")} />
+                      <span className="workflow-star-nameplate-copy">
+                        <span>{formatRole(roleKey)}</span>
+                        <strong>
+                          {role
+                            ? `${formatRecommendation(role.recommendation, { uppercase: true })} · ${formatPercent(role.confidence * 100, false)}`
+                            : resolveStatusLabel(t, "idle")}
+                        </strong>
+                      </span>
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </section>
+
+          <div className="workflow-star-bottom">
+            <section className="workflow-star-panel">
+              <div className="workflow-star-panel-head">
+                <div>
+                  <span className="section-label">{t("workflowStudio.pipeline")}</span>
+                  <strong>{t("workflowStudio.commandMap")}</strong>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="workflow-command-support-grid">
-            <section className="workflow-command-support-card">
-              <div className="workflow-command-support-head">
-                <BrainCircuit size={16} />
-                <strong>{t("workflow.roles")}</strong>
+                <Badge color={badgeColor(snapshot.stages[activeStageKey].status)}>
+                  {resolveStageLabel(t, snapshot.stages[activeStageKey])}
+                </Badge>
               </div>
-              <div className="workflow-command-role-grid">
-                {ROLE_ORDER.map((roleKey) => {
-                  const role = roleMap.get(roleKey);
-                  return role ? (
-                    <button
-                      type="button"
-                      className="workflow-role-node"
-                      data-testid="workflow-role-node"
-                      data-kind="persona"
-                      data-active={selectedId === `role:${role.role}`}
-                      data-status={role.status}
-                      key={role.role}
-                      onClick={() => setSelection(`role:${role.role}`)}
-                    >
-                      <span>{formatRole(role.role)}</span>
-                      <strong>
-                        {formatRecommendation(role.recommendation, { uppercase: true })} · {formatPercent(role.confidence * 100, false)}
-                      </strong>
-                      <small className="token-ellipsis" title={role.provider}>{role.provider}</small>
-                    </button>
-                  ) : (
-                    <article
-                      className="workflow-role-node workflow-role-node--empty"
-                      data-testid="workflow-role-node"
-                      data-kind="persona"
-                      key={roleKey}
-                    >
-                      <span>{formatRole(roleKey)}</span>
-                      <strong>{t("workflow.status.idle")}</strong>
-                      <small>{t("workflow.noDetail")}</small>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="workflow-command-support-card">
-              <div className="workflow-command-support-head">
-                <Cable size={16} />
-                <strong>{t("workflowStudio.providerMatrix")}</strong>
-              </div>
-              <div className="workflow-command-provider-grid">
-                {snapshot.providers.map((provider) => {
-                  const Icon = providerIcon(provider.provider);
+              <div className="workflow-star-lane-grid">
+                {STAGE_ORDER.map((key) => {
+                  const stage = snapshot.stages[key];
                   return (
                     <button
                       type="button"
-                      className="workflow-provider-node"
-                      data-active={selectedId === `provider:${provider.provider}`}
-                      data-status={provider.status}
-                      key={provider.provider}
-                      onClick={() => setSelection(`provider:${provider.provider}`)}
+                      className="workflow-star-lane-card"
+                      key={key}
+                      onClick={() => setSelection(`stage:${key}`)}
                     >
-                      <span className="workflow-provider-node-icon">
-                        <Icon size={16} />
-                      </span>
-                      <div>
-                        <span>{provider.label}</span>
-                        <strong>{provider.effective ? t("workflow.effective") : resolveAvailabilityLabel(t, provider.availability)}</strong>
+                      <div className="workflow-star-node-head">
+                        <span>{resolveStageLabel(t, stage)}</span>
+                        <Badge color={badgeColor(stage.status)}>{resolveStatusLabel(t, stage.status)}</Badge>
                       </div>
+                      <strong>{stage.actor ?? resolveStatusLabel(t, stage.status)}</strong>
+                      <p className="clamp-3 copy-break" title={stage.detail ?? t("workflow.noDetail")}>
+                        {stage.detail ?? t("workflow.noDetail")}
+                      </p>
                     </button>
                   );
                 })}
               </div>
             </section>
-          </div>
-        </section>
 
-        <aside className="workflow-command-card workflow-command-card--detail">
-          <div className="workflow-command-card-head">
-            <div>
-              <span className="section-label">{detailView?.eyebrow ?? t("workflowStudio.inspector")}</span>
-              <h4>{detailView?.title ?? t("workflow.title")}</h4>
-            </div>
-            {detailView ? <Badge color={detailView.statusColor}>{detailView.status}</Badge> : null}
-          </div>
+            <section className="workflow-star-panel">
+              <div className="workflow-star-panel-head">
+                <div>
+                  <span className="section-label">{t("workflowStudio.providerDock")}</span>
+                  <strong>{t("workflow.providers")}</strong>
+                </div>
+                <Badge color="cyan">{snapshot.providers.length}</Badge>
+              </div>
+              <div className="workflow-star-provider-dock">
+                {snapshot.providers.length > 0 ? (
+                  snapshot.providers.map((provider) => {
+                    const Icon = providerIcon(provider.provider);
+                    return (
+                      <button
+                        type="button"
+                        className="workflow-star-provider-card"
+                        data-active={selectedId === `provider:${provider.provider}`}
+                        data-tone={toneForStatus(provider.status)}
+                        key={provider.provider}
+                        onClick={() => setSelection(`provider:${provider.provider}`)}
+                      >
+                        <span className="workflow-star-provider-avatar">
+                          <Icon size={18} />
+                        </span>
+                        <div className="workflow-star-provider-body">
+                          <div className="workflow-star-provider-headline">
+                            <div className="workflow-star-provider-copy">
+                              <span>{resolveStrategyPhaseLabel(t, provider.phase)}</span>
+                              <strong>{provider.label}</strong>
+                            </div>
+                            <Badge color={badgeColor(provider.status)}>
+                              {provider.effective
+                                ? t("workflow.effective")
+                                : resolveAvailabilityLabel(t, provider.availability)}
+                            </Badge>
+                          </div>
+                          <p className="clamp-2 copy-break" title={provider.detail ?? provider.command ?? t("workflow.noDetail")}>
+                            {provider.detail ?? provider.command ?? t("workflow.noDetail")}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="empty-state">{t("workflow.noProviders")}</div>
+                )}
+              </div>
+            </section>
 
-          <p className="quiet-copy clamp-4 copy-break" title={detailView?.detail ?? t("workflowStudio.selectionHint")}>
-            {detailView?.detail ?? t("workflowStudio.selectionHint")}
-          </p>
-
-          <div className="workflow-command-detail-meta">
-            {(detailView?.meta ?? []).map((item) => (
-              <article className="workflow-command-detail-item" key={`${item.label}-${item.value}`}>
-                <span>{item.label}</span>
-                <strong className="copy-break" title={item.value}>{item.value}</strong>
-              </article>
-            ))}
-          </div>
-
-          <div className="workflow-command-facts">
-            {(detailView?.facts ?? []).map((fact) => (
-              <div className="workflow-command-fact-pill" key={fact}>{fact}</div>
-            ))}
-          </div>
-        </aside>
-      </div>
-
-      <div className="workflow-command-grid">
-        <section className="workflow-command-card">
-          <div className="workflow-command-card-head">
-            <div>
-              <span className="section-label">{t("workflowStudio.providerDock")}</span>
-              <h4>{t("workflow.providers")}</h4>
-            </div>
-          </div>
-          <div className="workflow-provider-matrix-list">
-            {snapshot.providers.length > 0 ? (
-              snapshot.providers.map((provider) => {
-                const Icon = providerIcon(provider.provider);
-                return (
-                  <article className="workflow-provider-matrix-row" data-status={provider.status} key={provider.provider}>
-                    <span className="workflow-provider-matrix-icon">
-                      <Icon size={16} />
-                    </span>
-                    <div className="workflow-provider-matrix-copy">
-                      <div className="workflow-provider-matrix-headline">
-                        <strong>{provider.label}</strong>
-                        <Badge color={badgeColor(provider.status)}>
-                          {provider.effective ? t("workflow.effective") : resolveAvailabilityLabel(t, provider.availability)}
-                        </Badge>
+            <section className="workflow-star-panel">
+              <div className="workflow-star-panel-head">
+                <div>
+                  <span className="section-label">{t("workflowStudio.missionLog")}</span>
+                  <strong>{t("agentOps.recentEvents")}</strong>
+                </div>
+                <Badge color="cyan">{recentEvents.length}</Badge>
+              </div>
+              <div className="workflow-star-log-list">
+                {recentEvents.length > 0 ? (
+                  recentEvents.map((event) => (
+                    <article className="workflow-star-log-row" key={event.event_id}>
+                      <div className="workflow-star-log-head">
+                        <span>{event.event_type}</span>
+                        <small>{formatDateTime(event.generated_at)}</small>
                       </div>
-                      <span>
-                        {resolveStatusLabel(t, provider.status)} · {resolveStrategyPhaseLabel(t, provider.phase)}
-                      </span>
-                      <p className="clamp-2 copy-break" title={provider.detail ?? provider.command ?? t("workflow.noDetail")}>
-                        {provider.detail ?? provider.command ?? t("workflow.noDetail")}
+                      <p className="clamp-3 copy-break" title={describeEvent(event)}>
+                        {describeEvent(event)}
                       </p>
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="empty-state">{t("workflow.noProviders")}</div>
-            )}
+                    </article>
+                  ))
+                ) : (
+                  <div className="empty-state">{t("workflowStudio.noEvents")}</div>
+                )}
+              </div>
+            </section>
           </div>
-        </section>
+        </div>
 
-        <section className="workflow-command-card">
-          <div className="workflow-command-card-head">
-            <div>
-              <span className="section-label">{t("workflowStudio.missionLog")}</span>
-              <h4>{t("agentOps.recentEvents")}</h4>
+        {drawerOpen ? (
+          <aside className="workflow-star-drawer">
+            <div className="workflow-star-drawer-head">
+              <div>
+                <span className="section-label">{detailView?.eyebrow ?? t("workflowStudio.inspector")}</span>
+                <h4>{detailView?.title ?? t("workflow.title")}</h4>
+              </div>
+              {detailView ? <Badge color={detailView.statusColor}>{detailView.status}</Badge> : null}
             </div>
-          </div>
-          <div className="workflow-command-log-list">
-            {recentEvents.length > 0 ? (
-              recentEvents.map((event) => (
-                <article className="workflow-command-log-row" key={event.event_id}>
-                  <div className="workflow-command-log-head">
-                    <span>{event.event_type}</span>
-                    <small>{formatDateTime(event.generated_at)}</small>
+
+            <p className="quiet-copy clamp-4 copy-break" title={detailView?.detail ?? t("workflowStudio.selectionHint")}>
+              {detailView?.detail ?? t("workflowStudio.selectionHint")}
+            </p>
+
+            <div className="workflow-star-inspector-meta">
+              {(detailView?.meta ?? []).map((item) => (
+                <article className="workflow-star-meta-row" key={`${item.label}-${item.value}`}>
+                  <span>{item.label}</span>
+                  <strong className="copy-break" title={item.value}>
+                    {item.value}
+                  </strong>
+                </article>
+              ))}
+            </div>
+
+            <div className="workflow-star-facts">
+              <div className="workflow-star-panel-head">
+                <div>
+                  <span className="section-label">{t("workflowStudio.summary")}</span>
+                  <strong>{t("workflowStudio.executionTruth")}</strong>
+                </div>
+              </div>
+              <div className="workflow-star-fact-list">
+                {(detailView?.facts ?? []).map((fact) => (
+                  <div className="workflow-star-fact-pill" key={fact}>
+                    {fact}
                   </div>
-                  <p className="clamp-2 copy-break" title={describeEvent(event)}>{describeEvent(event)}</p>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">{t("workflowStudio.noEvents")}</div>
-            )}
-          </div>
-        </section>
-      </div>
+                ))}
+              </div>
+            </div>
 
-      <div className="workflow-command-grid">
-        <section className="workflow-command-card">
-          <div className="workflow-command-card-head">
-            <div>
-              <span className="section-label">{t("workflowStudio.auditTitle")}</span>
-              <h4>{t("workflowStudio.auditDescription")}</h4>
+            <div className="workflow-star-facts">
+              <div className="workflow-star-panel-head">
+                <div>
+                  <span className="section-label">{t("workflowStudio.auditTitle")}</span>
+                  <strong>{t("workflowStudio.auditDescription")}</strong>
+                </div>
+              </div>
+              <div className="workflow-star-inspector-meta">
+                {valueAuditRows.slice(0, 4).map((row) => (
+                  <article className="workflow-star-meta-row" key={row.id}>
+                    <span>{row.area}</span>
+                    <strong>
+                      <Badge color={row.tone}>{row.verdict}</Badge>
+                    </strong>
+                    <span className="copy-break" title={row.reason}>{row.reason}</span>
+                  </article>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="workflow-audit-table">
-            <div className="workflow-audit-table-head">
-              <span>{t("workflowStudio.auditArea")}</span>
-              <span>{t("workflowStudio.auditVerdict")}</span>
-              <span>{t("workflowStudio.auditReason")}</span>
-              <span>{t("workflowStudio.auditNext")}</span>
-            </div>
-            {valueAuditRows.map((row) => (
-              <article className="workflow-audit-row" key={row.id}>
-                <strong>{row.area}</strong>
-                <Badge color={row.tone}>{row.verdict}</Badge>
-                <p className="clamp-2 copy-break" title={row.reason}>{row.reason}</p>
-                <span>{row.next}</span>
-              </article>
-            ))}
-          </div>
-        </section>
 
-        <section className="workflow-command-card">
-          <div className="workflow-command-card-head">
-            <div>
-              <span className="section-label">{t("workflowStudio.evalTitle")}</span>
-              <h4>{t("workflowStudio.evalDescription")}</h4>
+            <div className="workflow-star-facts">
+              <div className="workflow-star-panel-head">
+                <div>
+                  <span className="section-label">{t("workflowStudio.evalTitle")}</span>
+                  <strong>{t("workflowStudio.evalCommandLine")}</strong>
+                </div>
+              </div>
+              <div className="workflow-star-fact-list">
+                <div className="workflow-star-fact-pill">cd frontend && npm run build</div>
+                <div className="workflow-star-fact-pill">cd frontend && npm run e2e:release</div>
+                <div className="workflow-star-fact-pill">cd backend && pytest tests/test_workflow_runtime.py</div>
+                <div className="workflow-star-fact-pill">docker compose up backend frontend</div>
+              </div>
             </div>
-          </div>
-
-          <div className="workflow-eval-section">
-            <div className="workflow-eval-head">
-              <ClipboardList size={16} />
-              <strong>{t("workflowStudio.evalDashboard")}</strong>
-            </div>
-            <div className="workflow-eval-list">
-              {evaluationDashboardItems.map((item) => (
-                <article className="workflow-eval-row" key={item.where}>
-                  <span>{t("workflowStudio.evalWhere")}</span>
-                  <strong>{item.where}</strong>
-                  <p>{item.check}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="workflow-eval-section">
-            <div className="workflow-eval-head">
-              <Activity size={16} />
-              <strong>{t("workflowStudio.evalCommandLine")}</strong>
-            </div>
-            <div className="workflow-eval-list">
-              {evaluationCliItems.map((item) => (
-                <article className="workflow-eval-row" key={item.command}>
-                  <span>{t("workflowStudio.evalCommand")}</span>
-                  <code>{item.command}</code>
-                  <p>{item.expectation}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="workflow-runbook-note">
-            <span>{t("workflowStudio.docPathLabel")}</span>
-            <strong>/Users/suhui/Documents/百度同步/Project_Interest/ai-quant-empire/docs/runbooks/system-workflow-evaluation.md</strong>
-          </div>
-        </section>
+          </aside>
+        ) : null}
       </div>
     </div>
   );

@@ -1,0 +1,50 @@
+8bfadf4 (HEAD -> main, origin/main) Merge branch 'codex/live-readiness-plan'
+9b414cb chore: trigger main deployment
+acdc20c (origin/master, origin/codex/live-readiness-plan, master) feat: add static preview runtime fallback
+a757d1b (codex/live-readiness-plan) feat: add static preview runtime fallback
+b4dd6db feat: harden SFC-Quant workflow and live intelligence
+c6d6929 feat: harden SFC-Quant workflow and live intelligence
+a76e568 docs: add live market readiness plan
+cb195fb docs: capture todo - real market and live execution integration
+6b38868 Merge branch 'codex/v1-archive-provider-ship'
+50d5ea1 (codex/v1-archive-provider-ship) Release harden SFC-Quant terminal workspace
+97d7e55 (codex/terminal-dashboard-impeccable) docs: start milestone v1.1 bilingual live market readiness
+dede07c docs: capture todo - Add bilingual UI and real market integration
+128370d (origin/codex/v1-archive-provider-ship) fix(frontend): serve built preview in docker
+1f8e04a feat(strategy): add optional rd-agent runtime path
+addb005 (tag: v1.0) chore: archive v1.0 milestone and cleanup planning state
+5d24e29 fix(provider): normalize openai-compatible responses output
+40915f0 feat(phase-9): add hardening tests and release docs
+06e479f feat(phase-8): add strategy factory and macro evidence
+89829ad feat(phase-7): add advanced visual analytics
+8350a8e feat(phase-6): add pro trading dashboard shell
+10e2c22 feat(phase-5): add risk guardrails and live gating
+224846c feat(phase-4): add paper trading execution loop
+b00d00c chore(phase-3): finalize provider defaults
+0cf740b feat(phase-3): add primoagent core graph
+29e623c feat(phase-2): add market data event backbone
+4d9c026 wip: pause phase 1 for migration handoff
+89ecacb docs(01): align roadmap and state with human verification gate
+2c391f9 docs(01): finalize execution artifacts and verification state
+dfb363f chore(01-04): stabilize frontend build artifacts
+c248453 test(01-04): align backend smoke checks with docs
+b304eef docs(01-04): add bootstrap and safety guide
+5ce45e0 docs(01-03): record container summary
+834d022 feat(01-03): define two-service compose stack
+5241f28 feat(01-03): add frontend container runtime
+c5af722 feat(01-03): add backend container runtime
+917eb6f docs(01-02): record runtime summary
+9e07348 feat(01-02): surface runtime state across UI and tests
+82a8088 feat(01-02): add mock-safe backend runtime resolution
+d343785 chore(01-02): define phase 1 env contract
+0d4c180 docs(01-01): record scaffold summary
+4410591 chore(01-01): add monorepo ignore rules
+96c83d2 feat(01-01): scaffold React frontend workspace
+f52e4cd feat(01-01): scaffold FastAPI backend workspace
+96a7e62 docs(01): refine phase plans
+f7c6401 docs(01): create phase plan
+e65486b docs(01): add phase research and validation
+acf0457 docs(01): add phase context
+934275d docs: create roadmap (9 phases)
+f873b42 docs: add project research
+b70a9e8 docs: define v1 requirements

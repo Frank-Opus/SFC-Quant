@@ -1,0 +1,289 @@
+{
+  "generated_at": "2026-04-04T10:09:13.981820Z",
+  "symbol": "BTC/USDT",
+  "timeframe": "1m",
+  "current_run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706",
+  "active_stage_key": "analysis",
+  "current_handoff": "PrimoAgent completed with HOLD recommendation.",
+  "execution_mode": "paper",
+  "execution_adapter": "freqtrade_mock",
+  "requested_market_source": "ccxt",
+  "effective_market_source": "ccxt",
+  "stages": {
+    "market": {
+      "key": "market",
+      "label": "Market Feed",
+      "status": "completed",
+      "detail": "Real market data is active via ccxt.",
+      "updated_at": "2026-04-04T10:09:13.981820Z",
+      "run_id": null,
+      "actor": "ccxt",
+      "facts": [
+        {
+          "label": "Requested",
+          "value": "CCXT",
+          "tone": "info"
+        },
+        {
+          "label": "Effective",
+          "value": "CCXT",
+          "tone": "positive"
+        },
+        {
+          "label": "Status",
+          "value": "LIVE",
+          "tone": "neutral"
+        },
+        {
+          "label": "Instrument",
+          "value": "BTC/USDT 1m",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "analysis": {
+      "key": "analysis",
+      "label": "PrimoAgent",
+      "status": "completed",
+      "detail": "PrimoAgent completed with HOLD recommendation.",
+      "updated_at": "2026-04-04T09:05:53.781044Z",
+      "run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706",
+      "actor": "gpt-5.4",
+      "facts": [
+        {
+          "label": "Recommendation",
+          "value": "HOLD",
+          "tone": "info"
+        },
+        {
+          "label": "Roles",
+          "value": "4",
+          "tone": "neutral"
+        },
+        {
+          "label": "Provider",
+          "value": "openai_compatible",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "strategy": {
+      "key": "strategy",
+      "label": "Strategy Factory",
+      "status": "completed",
+      "detail": "Deterministic review artifact completed.",
+      "updated_at": "2026-04-04T08:34:29.777216Z",
+      "run_id": "0468a7b3-8c8c-489b-8681-4637e279ad98",
+      "actor": "Deterministic Mock",
+      "facts": [
+        {
+          "label": "Configured",
+          "value": "mock_rdq",
+          "tone": "neutral"
+        },
+        {
+          "label": "Effective",
+          "value": "mock_rdq",
+          "tone": "info"
+        },
+        {
+          "label": "Artifacts",
+          "value": "15",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "risk": {
+      "key": "risk",
+      "label": "Risk Guard",
+      "status": "ready",
+      "detail": "Daily realized P&L 0.00; live mode disabled.",
+      "updated_at": null,
+      "run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706",
+      "actor": "policy engine",
+      "facts": [
+        {
+          "label": "Loss Limit",
+          "value": "250 USD",
+          "tone": "neutral"
+        },
+        {
+          "label": "Live Gate",
+          "value": "OFF",
+          "tone": "positive"
+        },
+        {
+          "label": "Approval",
+          "value": "Required",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "execution": {
+      "key": "execution",
+      "label": "Paper Execution",
+      "status": "ready",
+      "detail": "Mock Freqtrade adapter active; fills are simulated in-process.",
+      "updated_at": null,
+      "run_id": "0468a7b3-8c8c-489b-8681-4637e279ad98",
+      "actor": "freqtrade_mock",
+      "facts": [
+        {
+          "label": "Adapter",
+          "value": "freqtrade_mock",
+          "tone": "info"
+        },
+        {
+          "label": "Cash",
+          "value": "10000.00 USD",
+          "tone": "neutral"
+        },
+        {
+          "label": "Positions",
+          "value": "0",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "performance": {
+      "key": "performance",
+      "label": "Performance",
+      "status": "ready",
+      "detail": "No realized paper trades yet; tracking equity and drawdown baselines.",
+      "updated_at": "2026-04-04T08:33:05.123201Z",
+      "run_id": "0468a7b3-8c8c-489b-8681-4637e279ad98",
+      "actor": "paper_execution_runtime",
+      "facts": [
+        {
+          "label": "Trades",
+          "value": "0",
+          "tone": "neutral"
+        },
+        {
+          "label": "Return",
+          "value": "0.00%",
+          "tone": "positive"
+        },
+        {
+          "label": "Drawdown",
+          "value": "0.00%",
+          "tone": "warning"
+        },
+        {
+          "label": "Open Positions",
+          "value": "0",
+          "tone": "neutral"
+        }
+      ]
+    }
+  },
+  "roles": [
+    {
+      "role": "data",
+      "label": "Data",
+      "status": "completed",
+      "provider": "openai_compatible",
+      "model": "gpt-5.4",
+      "recommendation": "hold",
+      "confidence": 0.4,
+      "summary": "BTC/USDT on the 1m timeframe appears short-horizon neutral with weak directional conviction. Price change is essentially flat, sample size is small, and external intelligence is only partially available, so market-state quality is limited for a confident tactical call.",
+      "generated_at": "2026-04-04T09:05:08.628566Z",
+      "run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706"
+    },
+    {
+      "role": "technical_analysis",
+      "label": "Technical",
+      "status": "completed",
+      "provider": "openai_compatible",
+      "model": "gpt-5.4",
+      "recommendation": "hold",
+      "confidence": 0.34,
+      "summary": "BTC/USDT on the 1m timeframe remains tactically neutral. Last price is essentially unchanged, the sample is very short at 24 candles, and available context does not show a clean momentum edge for immediate continuation or reversal.",
+      "generated_at": "2026-04-04T09:05:22.914098Z",
+      "run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706"
+    },
+    {
+      "role": "news_geopolitics",
+      "label": "Macro / News",
+      "status": "completed",
+      "provider": "openai_compatible",
+      "model": "gpt-5.4",
+      "recommendation": "hold",
+      "confidence": 0.36,
+      "summary": "Geopolitical and macro-news context is mixed to slightly risk-off for BTC on a 1m horizon, but the available intelligence is partial and some key macro rate feeds are missing. Elevated dollar and oil inputs argue for caution, while the listed crypto headlines are idiosyncratic rather than clear immediate catalysts for broad BTC direction.",
+      "generated_at": "2026-04-04T09:05:38.901181Z",
+      "run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706"
+    },
+    {
+      "role": "risk_decision",
+      "label": "Risk",
+      "status": "completed",
+      "provider": "openai_compatible",
+      "model": "gpt-5.4",
+      "recommendation": "hold",
+      "confidence": 0.31,
+      "summary": "BTC/USDT on the 1m timeframe does not present a reliable risk-adjusted edge. Price is effectively flat, the sample is very short at 24 candles, and external intelligence is partial with missing core rates data, so the prudent decision is to avoid forcing a directional trade.",
+      "generated_at": "2026-04-04T09:05:53.774916Z",
+      "run_id": "4a368653-9e48-4b99-ae1b-06c1dfcbf706"
+    }
+  ],
+  "providers": [
+    {
+      "provider": "mock_rdq",
+      "label": "Deterministic Mock",
+      "status": "completed",
+      "availability": "ready",
+      "configured": true,
+      "effective": true,
+      "phase": "completed",
+      "detail": "Deterministic review artifact completed.",
+      "command": null,
+      "updated_at": "2026-04-04T08:34:29.777216Z",
+      "run_id": "0468a7b3-8c8c-489b-8681-4637e279ad98",
+      "artifact_count": 3
+    },
+    {
+      "provider": "rd_agent_q",
+      "label": "RD-Agent(Q)",
+      "status": "degraded",
+      "availability": "fallback",
+      "configured": false,
+      "effective": false,
+      "phase": "idle",
+      "detail": "Configured provider command is unavailable. Install the provider runtime or set the command explicitly; local deterministic generation remains active.",
+      "command": "rdagent fin_quant",
+      "updated_at": null,
+      "run_id": null,
+      "artifact_count": 0
+    },
+    {
+      "provider": "tradingagents_cn",
+      "label": "TradingAgents-CN",
+      "status": "degraded",
+      "availability": "fallback",
+      "configured": false,
+      "effective": false,
+      "phase": "idle",
+      "detail": "Configured provider command is unavailable. Install the provider runtime or set the command explicitly; local deterministic generation remains active.",
+      "command": "tradingagents",
+      "updated_at": null,
+      "run_id": null,
+      "artifact_count": 0
+    },
+    {
+      "provider": "external",
+      "label": "External (reserved)",
+      "status": "failed",
+      "availability": "unavailable",
+      "configured": false,
+      "effective": false,
+      "phase": "idle",
+      "detail": "Configured provider 'external' is reserved for future adapters; local deterministic generation remains active.",
+      "command": null,
+      "updated_at": null,
+      "run_id": null,
+      "artifact_count": 0
+    }
+  ],
+  "notices": []
+}

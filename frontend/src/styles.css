@@ -3706,8 +3706,12 @@ button {
 }
 
 .workflow-star-bottom {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   margin-top: 1rem;
+}
+
+.workflow-star-bottom > :first-child {
+  grid-row: span 2;
 }
 
 .workflow-star-panel,

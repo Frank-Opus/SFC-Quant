@@ -1,0 +1,4 @@
+INFO:     Started server process [31025]
+INFO:     Waiting for application startup.
+{"timestamp": "2026-04-04T05:04:04.304925+00:00", "level": "info", "logger": "app.main", "message": "app_starting", "app": "dSFC-Quant", "env": "development", "service": "backend", "app_mode": "mock"}
+{"timestamp": "2026-04-04T05:04:06.079448+00:00", "level": "info", "logger": "app.services.event_bus", "message": "event_published", "app": "dSFC-Quant", "env": "development", "event_id": "4be6caf4-ddbd-48fc-b087-378c234b11c7", "event_type": "market.tick", "source": "backend"}
