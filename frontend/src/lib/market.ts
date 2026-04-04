@@ -637,6 +637,10 @@ function readEnvValue(key: "VITE_API_BASE_URL" | "VITE_WS_URL"): string | undefi
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+export function isStaticPreviewMode(): boolean {
+  return import.meta.env.VITE_STATIC_PREVIEW === "true";
+}
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/$/, "");
 }
@@ -669,6 +673,10 @@ export function resolveBackendWsUrl(): string {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isStaticPreviewMode()) {
+    throw new Error("Static preview mode disables backend runtime requests.");
+  }
+
   const response = await fetch(`${resolveBackendBaseUrl()}${path}`, {
     headers: {
       "Content-Type": "application/json",
