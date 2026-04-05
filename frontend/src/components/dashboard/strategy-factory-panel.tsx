@@ -27,6 +27,15 @@ function availabilityColor(availability: "ready" | "fallback" | "unavailable"): 
   return "red";
 }
 
+function providerAvailabilityColor(
+  provider: StrategyFactoryStatusResponse["providers"][number],
+): "green" | "amber" | "red" {
+  if (!provider.configured && !provider.effective) {
+    return "amber";
+  }
+  return availabilityColor(provider.availability);
+}
+
 export function StrategyFactoryPanel({
   status,
   artifacts,
@@ -45,12 +54,12 @@ export function StrategyFactoryPanel({
     return translated === key ? phase : translated;
   };
 
-  const resolveAvailabilityLabel = (
-    availability: "ready" | "fallback" | "unavailable",
-  ): string => {
-    const key = `strategy.availability.${availability}`;
+  const resolveAvailabilityLabel = (provider: StrategyFactoryStatusResponse["providers"][number]): string => {
+    const key = `strategy.availability.${
+      !provider.configured && !provider.effective ? "optional" : provider.availability
+    }`;
     const translated = t(key);
-    return translated === key ? availability : translated;
+    return translated === key ? provider.availability : translated;
   };
 
   return (
@@ -150,7 +159,7 @@ export function StrategyFactoryPanel({
               <div>
                 <span className="section-label">{provider.label}</span>
                 <strong>
-                  {resolveAvailabilityLabel(provider.availability)}
+                  {resolveAvailabilityLabel(provider)}
                   {provider.effective ? ` · ${t("strategy.current")}` : ""}
                 </strong>
                 <p className="clamp-2 copy-break" title={provider.reason ?? provider.command ?? provider.provider}>
@@ -158,7 +167,7 @@ export function StrategyFactoryPanel({
                 </p>
                 {provider.command ? <small className="copy-break">{provider.command}</small> : null}
               </div>
-              <Badge color={availabilityColor(provider.availability)}>
+              <Badge color={providerAvailabilityColor(provider)}>
                 {provider.provider}
               </Badge>
             </article>

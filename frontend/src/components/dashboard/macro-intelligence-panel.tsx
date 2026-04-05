@@ -20,6 +20,19 @@ function badgeColor(status: IntelligenceSnapshotResponse["status"]): "green" | "
   return "red";
 }
 
+function providerStatusLabel(
+  t: (key: string) => string,
+  provider: IntelligenceSnapshotResponse["providers"][number],
+): string {
+  if (provider.available) {
+    return t("macroIntel.providerLive");
+  }
+  if (!provider.configured) {
+    return t("macroIntel.providerNotConfigured");
+  }
+  return t("macroIntel.providerDown");
+}
+
 function metricTone(metric: IntelligenceMetric): "green" | "amber" | "red" | "cyan" {
   if (metric.change_percent == null) {
     return "cyan";
@@ -96,7 +109,7 @@ export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligenceP
           {snapshot.providers.map((provider) => (
             <article className="macro-intel-provider-chip" data-active={provider.available} key={provider.provider}>
               <span className="section-label">{provider.provider}</span>
-              <strong>{provider.available ? t("macroIntel.providerLive") : t("macroIntel.providerDown")}</strong>
+              <strong>{providerStatusLabel(t, provider)}</strong>
               <p className="clamp-2 copy-break" title={provider.detail}>{provider.detail}</p>
             </article>
           ))}

@@ -60,6 +60,9 @@ function badgeColor(status: string): "green" | "amber" | "red" | "cyan" {
 }
 
 function providerBadgeColor(provider: WorkflowProviderState): "green" | "amber" | "red" | "cyan" {
+  if (!provider.configured && !provider.effective) {
+    return "amber";
+  }
   if (provider.effective && provider.status === "completed") {
     return "green";
   }
@@ -101,6 +104,16 @@ function resolveAvailabilityLabel(t: (key: string) => string, availability: stri
   const key = `strategy.availability.${availability}`;
   const translated = t(key);
   return translated === key ? availability : translated;
+}
+
+function resolveProviderAvailabilityLabel(
+  t: (key: string) => string,
+  provider: WorkflowProviderState,
+): string {
+  return resolveAvailabilityLabel(
+    t,
+    !provider.configured && !provider.effective ? "optional" : provider.availability,
+  );
 }
 
 function RoleTrack({ role }: { role: WorkflowRoleState }) {
@@ -285,7 +298,7 @@ export function SystemWorkflowPanel({
                       <Badge color={providerBadgeColor(provider)}>
                         {provider.effective
                           ? t("workflow.effective")
-                          : resolveAvailabilityLabel(t, provider.availability)}
+                          : resolveProviderAvailabilityLabel(t, provider)}
                       </Badge>
                     </article>
                   ))

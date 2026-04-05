@@ -30,6 +30,15 @@ function badgeColor(status: string): "green" | "amber" | "red" | "cyan" {
   return "red";
 }
 
+function strategyAgentBadgeColor(
+  agent: AgentRuntimeSummaryResponse["agents"][number],
+): "green" | "amber" | "red" | "cyan" {
+  if (!agent.configured && !agent.effective) {
+    return "amber";
+  }
+  return badgeColor(agent.status);
+}
+
 export function AgentRuntimePanel({
   latestAnalysis,
   agentRuntime,
@@ -37,6 +46,13 @@ export function AgentRuntimePanel({
   eventFeed,
 }: AgentRuntimePanelProps) {
   const { t, formatDateTime, formatPercent, formatRecommendation, formatRole } = useLocale();
+
+  const describeStrategyAgentStatus = (agent: AgentRuntimeSummaryResponse["agents"][number]) => {
+    if (!agent.configured && !agent.effective) {
+      return t("strategy.availability.optional");
+    }
+    return agent.status;
+  };
 
   const roleEvents = eventFeed
     .filter((event) => event.event_type === "agent.role.completed")
@@ -97,7 +113,7 @@ export function AgentRuntimePanel({
                   <div>
                     <span className="section-label">{agent.label}</span>
                     <strong>
-                      {agent.status} · {agent.phase}
+                      {describeStrategyAgentStatus(agent)} · {agent.phase}
                     </strong>
                     <p className="clamp-2 copy-break" title={agent.detail ?? agent.workspace}>
                       {agent.detail ?? agent.workspace}
@@ -106,7 +122,7 @@ export function AgentRuntimePanel({
                       {t("agentOps.logs", { count: agent.logs.length })} · {t("agentOps.artifacts", { count: agent.artifacts.length })}
                     </small>
                   </div>
-                  <Badge color={badgeColor(agent.status)}>{agent.provider}</Badge>
+                  <Badge color={strategyAgentBadgeColor(agent)}>{agent.provider}</Badge>
                 </article>
               ))
             ) : (

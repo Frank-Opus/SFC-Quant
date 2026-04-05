@@ -173,6 +173,23 @@ function resolveAvailabilityLabel(t: (key: string) => string, availability: stri
   return translated === key ? availability : translated;
 }
 
+function resolveProviderAvailabilityLabel(
+  t: (key: string) => string,
+  provider: WorkflowProviderState,
+): string {
+  return resolveAvailabilityLabel(
+    t,
+    !provider.configured && !provider.effective ? "optional" : provider.availability,
+  );
+}
+
+function providerBadgeColor(provider: WorkflowProviderState): "green" | "amber" | "red" | "cyan" {
+  if (!provider.configured && !provider.effective) {
+    return "amber";
+  }
+  return badgeColor(provider.status);
+}
+
 function resolveStrategyPhaseLabel(t: (key: string) => string, phase: string): string {
   const key = `strategy.phase.${phase}`;
   const translated = t(key);
@@ -455,8 +472,8 @@ export function AgentWorkflowStudio({
     return {
       eyebrow: t("workflowStudio.providerDetail"),
       title: provider.label,
-      status: resolveAvailabilityLabel(t, provider.availability),
-      statusColor: badgeColor(provider.status),
+      status: resolveProviderAvailabilityLabel(t, provider),
+      statusColor: providerBadgeColor(provider),
       detail: provider.detail ?? provider.command ?? t("workflow.noDetail"),
       meta: [
         { label: t("agentOps.phase"), value: resolveStrategyPhaseLabel(t, provider.phase) },
@@ -732,10 +749,10 @@ export function AgentWorkflowStudio({
                               <span>{resolveStrategyPhaseLabel(t, provider.phase)}</span>
                               <strong>{provider.label}</strong>
                             </div>
-                            <Badge color={badgeColor(provider.status)}>
+                            <Badge color={providerBadgeColor(provider)}>
                               {provider.effective
                                 ? t("workflow.effective")
-                                : resolveAvailabilityLabel(t, provider.availability)}
+                                : resolveProviderAvailabilityLabel(t, provider)}
                             </Badge>
                           </div>
                           <p className="clamp-2 copy-break" title={provider.detail ?? provider.command ?? t("workflow.noDetail")}>
