@@ -18,11 +18,12 @@ COPY scripts ./scripts
 COPY vendor ./vendor
 
 RUN python -m pip install --no-cache-dir --upgrade pip \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
     && if [ -n "$BACKEND_EXTRAS" ]; then python -m pip install --no-cache-dir ".[${BACKEND_EXTRAS}]"; else python -m pip install --no-cache-dir .; fi \
-    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ]; then \
-         if [ -d ./vendor/strategy_providers/rdagent ]; then python -m pip install --no-cache-dir -e ./vendor/strategy_providers/rdagent; fi; \
-         if [ -d ./vendor/strategy_providers/tradingagents_cn ]; then python -m pip install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn; fi; \
-       fi
+    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/rdagent ]; then python -m pip install --no-cache-dir -e ./vendor/strategy_providers/rdagent; fi \
+    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/tradingagents_cn ]; then python -m pip install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn; fi
 
 EXPOSE 8000
 
