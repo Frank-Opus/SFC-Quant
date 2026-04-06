@@ -88,6 +88,7 @@ test("SFC-Quant release walkthrough stays truthful and operable", async ({ page,
 
   await page.getByRole("button", { name: "宏观证据与策略工作区" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "宏观证据与策略工作区" })).toBeVisible();
+  await expect(page.getByTestId("section-truth-strip")).toBeVisible();
 
   const enableFactoryResponse = page.waitForResponse(
     (response) =>
@@ -112,6 +113,10 @@ test("SFC-Quant release walkthrough stays truthful and operable", async ({ page,
 
   await expect(page.getByTestId("strategy-generation-status")).toContainText("已完成");
   await expect(strategyFactoryPanel.getByTestId("strategy-recent-artifacts")).toContainText("最近工件");
+
+  await page.getByRole("button", { name: "运行时控制" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "运行时控制" })).toBeVisible();
+  await expect(page.locator(".workspace-surface").getByTestId("section-truth-strip").first()).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

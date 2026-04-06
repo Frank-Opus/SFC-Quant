@@ -29,6 +29,7 @@ import { PriceChart, type PriceMarker } from "./components/dashboard/price-chart
 import { PerformancePanel } from "./components/dashboard/performance-panel";
 import { SignalLog } from "./components/dashboard/signal-log";
 import { StrategyFactoryPanel } from "./components/dashboard/strategy-factory-panel";
+import { SectionTruthStrip } from "./components/dashboard/section-truth-strip";
 import { ThesisEvidencePanel } from "./components/dashboard/thesis-evidence-panel";
 import { Button } from "./components/ui/button";
 import {
@@ -814,11 +815,168 @@ export default function App() {
   const activeNavigationItem =
     navigationItems.find((item) => item.id === activeSection) ?? navigationItems[0];
   const showMarketDeckHeader = activeSection !== "market";
+  const showMarketTruthStrip = activeSection === "market";
   const showThesisHeader = activeSection !== "thesis";
   const showStrategyHeader = activeSection !== "strategy";
   const showAnalyticsHeader = activeSection !== "analytics";
   const showOperatorHeader = activeSection !== "operations";
   const showDiagnosticsHeader = activeSection !== "diagnostics";
+  const workflowStageLabel = workflow?.active_stage_key
+    ? t(`workflow.stage.${workflow.active_stage_key}`)
+    : t("workflow.noActiveStage");
+  const workflowStageDetail = (() => {
+    if (!workflow?.active_stage_key) {
+      return t("workflow.noDetail");
+    }
+    return workflow.stages[workflow.active_stage_key]?.detail ?? t("workflow.noDetail");
+  })();
+  const executionStatusLabel =
+    execution.engine_status === "running"
+      ? t("operator.executionActive")
+      : t("operator.executionPaused");
+  const quickActionButtons = (
+    <div className="operator-actions two-up compact-actions-grid">
+      <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
+        <Bot size={16} />
+        {t("operator.runAnalysis")}
+      </Button>
+      <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
+        <ArrowUpRight size={16} />
+        {t("operator.dispatchPaper")}
+      </Button>
+      <Button variant="secondary" onClick={refreshAll} disabled={Boolean(pendingAction)}>
+        <RefreshCcw size={16} />
+        {t("hero.refresh")}
+      </Button>
+      <Button variant="ghost" onClick={reconnect}>
+        <Cable size={16} />
+        {t("hero.reconnect")}
+      </Button>
+    </div>
+  );
+  const workflowTruthItems = [
+    {
+      id: "workflow-stage",
+      label: t("workflow.active"),
+      value: workflowStageLabel,
+      detail: workflowStageDetail,
+      tone: "info" as const,
+    },
+    {
+      id: "workflow-market",
+      label: t("runtime.marketRequested"),
+      value: `${resolveMarketSourceLabel(marketData.requested_source, t)} -> ${resolveMarketSourceLabel(marketData.effective_source, t)}`,
+      detail: marketStatusLabel,
+      tone:
+        marketData.effective_source === "ccxt" && marketStatusValue === "live"
+          ? ("success" as const)
+          : marketStatusValue === "fallback" || marketStatusValue === "degraded"
+            ? ("warning" as const)
+            : ("default" as const),
+    },
+    {
+      id: "workflow-execution",
+      label: t("hero.execution"),
+      value: executionStatusLabel,
+      detail: viewModel.topStates.execution.toUpperCase(),
+      tone: execution.engine_status === "running" ? ("success" as const) : ("warning" as const),
+    },
+  ];
+  const strategyTruthItems = [
+    {
+      id: "strategy-provider",
+      label: t("strategy.provider"),
+      value: strategyStatus.effective_provider,
+      detail: strategyStatus.reason ?? t(`strategy.generation.${strategyStatus.generation.status}`),
+      tone: strategyStatus.enabled ? ("info" as const) : ("warning" as const),
+    },
+    {
+      id: "strategy-artifacts",
+      label: t("strategy.artifacts"),
+      value: String(strategyStatus.artifact_count),
+      detail: strategyStatus.latest_artifact?.directory ?? t("strategy.ready"),
+      tone: strategyStatus.artifact_count > 0 ? ("success" as const) : ("default" as const),
+    },
+    {
+      id: "strategy-stage",
+      label: t("workflow.active"),
+      value: workflowStageLabel,
+      detail: workflowStageDetail,
+      tone: "info" as const,
+    },
+  ];
+  const analyticsTruthItems = [
+    {
+      id: "analytics-symbol",
+      label: t("marketDeck.selected"),
+      value: selectedMarket ? `${selectedMarket.symbol} · ${selectedMarket.timeframe}` : systemStatusLabel,
+      detail: selectedMarket ? `${formatCurrency(selectedMarket.last_price)} · ${formatPercent(selectedMarket.change_percent)}` : localizedConnectionMessage,
+      tone: "info" as const,
+    },
+    {
+      id: "analytics-events",
+      label: t("analytics.signalLog.title"),
+      value: t("analytics.signalLog.entries", { count: signalLogEvents.length }),
+      detail: latestAnalysis?.run_id ?? t("diagnostics.noneYet"),
+      tone: signalLogEvents.length > 0 ? ("success" as const) : ("default" as const),
+    },
+    {
+      id: "analytics-pnl",
+      label: t("performance.paperTitle"),
+      value: formatCurrency(paperPerformance.ending_balance - paperPerformance.starting_balance),
+      detail: `${formatPercent(paperPerformance.win_rate * 100, false)} · ${paperPerformance.trade_count} ${t("performance.closedTrades")}`,
+      tone:
+        paperPerformance.ending_balance - paperPerformance.starting_balance >= 0
+          ? ("success" as const)
+          : ("warning" as const),
+    },
+  ];
+  const operationsTruthItems = [
+    {
+      id: "operations-engine",
+      label: t("hero.execution"),
+      value: executionStatusLabel,
+      detail: execution.paused_reason ?? t("operator.engineReady"),
+      tone: execution.engine_status === "running" ? ("success" as const) : ("warning" as const),
+    },
+    {
+      id: "operations-risk",
+      label: t("overview.riskTitle"),
+      value: t(riskLabelKey(riskScore)),
+      detail: risk.halt_reason ?? t("operator.approvalRequired"),
+      tone: riskTone(riskScore) === "red" ? ("danger" as const) : riskTone(riskScore) === "amber" ? ("warning" as const) : ("success" as const),
+    },
+    {
+      id: "operations-live",
+      label: t("operator.liveGate"),
+      value: risk.live_mode_enabled ? t("operator.liveEnabled") : t("operator.liveLocked"),
+      detail: risk.live_mode_reason ?? t("operator.livePrompt"),
+      tone: risk.live_mode_enabled ? ("danger" as const) : ("default" as const),
+    },
+  ];
+  const diagnosticsTruthItems = [
+    {
+      id: "diagnostics-system",
+      label: t("runtime.systemStatus"),
+      value: systemStatusLabel,
+      detail: localizedConnectionMessage,
+      tone: viewModel.systemStatus === "normal" ? ("success" as const) : viewModel.systemStatus === "fallback" ? ("warning" as const) : ("danger" as const),
+    },
+    {
+      id: "diagnostics-provider",
+      label: t("hero.aiProvider"),
+      value: heroProviderLabel,
+      detail: snapshot.runtime.exchange_id,
+      tone: "info" as const,
+    },
+    {
+      id: "diagnostics-warnings",
+      label: t("diagnostics.warnings", { count: snapshot.runtime.warnings.length }),
+      value: String(snapshot.runtime.warnings.length),
+      detail: t("diagnostics.retries", { count: reconnectAttempts }),
+      tone: snapshot.runtime.warnings.length > 0 ? ("warning" as const) : ("success" as const),
+    },
+  ];
 
   const marketDeckPanel = (
     <Card className="panel-card market-deck workspace-card">
@@ -833,6 +991,7 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent>
+        {showMarketTruthStrip ? <SectionTruthStrip items={workflowTruthItems} compact /> : null}
         <div className="instrument-strip">
           {snapshot.snapshots.map((item: MarketSnapshot) => {
             const active =
@@ -914,6 +1073,36 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent>
+        <SectionTruthStrip
+          items={[
+            {
+              id: "thesis-recommendation",
+              label: t("thesis.recommendation"),
+              value: latestAnalysis
+                ? formatRecommendation(latestAnalysis.overall_recommendation, {
+                    uppercase: true,
+                  })
+                : t("thesis.pending"),
+              detail: latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty"),
+              tone: latestAnalysis ? ("success" as const) : ("default" as const),
+            },
+            {
+              id: "thesis-provider",
+              label: t("hero.aiProvider"),
+              value: latestAnalysis?.provider ?? heroProviderLabel,
+              detail: latestAnalysis?.model ?? snapshot.runtime.ai_model ?? snapshot.runtime.ai_provider,
+              tone: "info" as const,
+            },
+            {
+              id: "thesis-workflow",
+              label: t("workflow.active"),
+              value: workflowStageLabel,
+              detail: workflowStageDetail,
+              tone: "info" as const,
+            },
+          ]}
+          compact
+        />
         {latestAnalysis ? (
           <div className="thesis-layout">
             <div className="thesis-summary-card">
@@ -1019,6 +1208,8 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent>
+        <SectionTruthStrip items={strategyTruthItems} compact />
+        <div className="overview-quick-actions extension-quick-actions">{quickActionButtons}</div>
         <div className="extension-grid">
           <ThesisEvidencePanel macroRole={thesisMacroRole} />
           <MacroIntelligencePanel
@@ -1058,6 +1249,7 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent>
+        <SectionTruthStrip items={analyticsTruthItems} compact />
         <div className="analytics-grid">
           <SignalLog
             events={signalLogEvents}
@@ -1100,6 +1292,8 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent className="operator-stack">
+        <SectionTruthStrip items={operationsTruthItems} compact />
+        <div className="overview-quick-actions operator-quick-actions">{quickActionButtons}</div>
         <div className="operator-card-grid">
           <div className="operator-card">
             <div className="operator-title-row">
@@ -1244,6 +1438,7 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent className="diagnostics-stack">
+        <SectionTruthStrip items={diagnosticsTruthItems} compact />
         <div className="diagnostic-row">
           <div>
             <span className="section-label">{t("diagnostics.cashEquity")}</span>
@@ -1419,41 +1614,6 @@ export default function App() {
       describeEvent={describedEvent}
     />
   );
-
-  const quickActionButtons = (
-    <div className="operator-actions two-up compact-actions-grid">
-      <Button onClick={runAnalysisAction} disabled={Boolean(pendingAction)}>
-        <Bot size={16} />
-        {t("operator.runAnalysis")}
-      </Button>
-      <Button variant="secondary" onClick={dispatchAction} disabled={Boolean(pendingAction)}>
-        <ArrowUpRight size={16} />
-        {t("operator.dispatchPaper")}
-      </Button>
-      <Button variant="secondary" onClick={refreshAll} disabled={Boolean(pendingAction)}>
-        <RefreshCcw size={16} />
-        {t("hero.refresh")}
-      </Button>
-      <Button variant="ghost" onClick={reconnect}>
-        <Cable size={16} />
-        {t("hero.reconnect")}
-      </Button>
-    </div>
-  );
-
-  const workflowStageLabel = workflow?.active_stage_key
-    ? t(`workflow.stage.${workflow.active_stage_key}`)
-    : t("workflow.noActiveStage");
-  const workflowStageDetail = (() => {
-    if (!workflow?.active_stage_key) {
-      return t("workflow.noDetail");
-    }
-    return workflow.stages[workflow.active_stage_key]?.detail ?? t("workflow.noDetail");
-  })();
-  const executionStatusLabel =
-    execution.engine_status === "running"
-      ? t("operator.executionActive")
-      : t("operator.executionPaused");
 
   const overviewDigestPanel = (
     <Card className="panel-card overview-digest-card workspace-card">

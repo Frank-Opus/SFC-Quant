@@ -107,6 +107,40 @@ def write_fake_validation_cli(tmp_path: Path, filename: str = "fake_validation_c
     return script_path
 
 
+def write_fake_vendored_rdagent_repo(tmp_path: Path) -> Path:
+    repo_root = tmp_path / "vendors" / "rdagent"
+    cli_path = repo_root / "rdagent" / "app" / "cli.py"
+    cli_path.parent.mkdir(parents=True, exist_ok=True)
+    cli_path.write_text(
+        "\n".join(
+            [
+                "def app():",
+                "    return 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return repo_root
+
+
+def write_fake_vendored_tradingagents_repo(tmp_path: Path) -> Path:
+    repo_root = tmp_path / "vendors" / "tradingagents_cn"
+    main_path = repo_root / "cli" / "main.py"
+    main_path.parent.mkdir(parents=True, exist_ok=True)
+    main_path.write_text(
+        "\n".join(
+            [
+                "def main():",
+                "    return 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return repo_root
+
+
 def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -> None:
     workspace = configure_strategy_env(monkeypatch, tmp_path)
 
@@ -155,6 +189,118 @@ def test_strategy_factory_reports_real_rd_agent_when_command_is_available(
     )
     assert runtime["available"] is True
     assert runtime["availability"] == "ready"
+
+    get_settings.cache_clear()
+
+
+def test_strategy_factory_prefers_vendored_rd_agent_repo(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    vendor_root = write_fake_vendored_rdagent_repo(tmp_path).parent
+    monkeypatch.setenv("DSFC_STRATEGY_PROVIDER_VENDOR_ROOT", str(vendor_root))
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "rd_agent_q")
+    monkeypatch.delenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", raising=False)
+    monkeypatch.setattr(StrategyFactoryService, "_rd_agent_has_docker_access", lambda self: True)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/api/strategy/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configured_provider"] == "rd_agent_q"
+    assert payload["effective_provider"] == "rd_agent_q"
+    runtime = next(
+        item for item in payload["providers"] if item["provider"] == "rd_agent_q"
+    )
+    assert runtime["available"] is True
+    assert runtime["availability"] == "ready"
+    assert "run_rdagent.py" in (runtime["command"] or "")
+
+    get_settings.cache_clear()
+
+
+def test_strategy_factory_prefers_vendored_tradingagents_repo(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    vendor_root = write_fake_vendored_tradingagents_repo(tmp_path).parent
+    monkeypatch.setenv("DSFC_STRATEGY_PROVIDER_VENDOR_ROOT", str(vendor_root))
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "tradingagents_cn")
+    monkeypatch.delenv("STRATEGY_FACTORY_TRADINGAGENTS_COMMAND", raising=False)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/api/strategy/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configured_provider"] == "tradingagents_cn"
+    assert payload["effective_provider"] == "tradingagents_cn"
+    runtime = next(
+        item for item in payload["providers"] if item["provider"] == "tradingagents_cn"
+    )
+    assert runtime["available"] is True
+    assert runtime["availability"] == "ready"
+    assert "run_tradingagents.py" in (runtime["command"] or "")
+
+    get_settings.cache_clear()
+
+
+def test_strategy_factory_reports_missing_vendored_provider_honestly(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("DSFC_STRATEGY_PROVIDER_VENDOR_ROOT", str(tmp_path / "empty-vendors"))
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "tradingagents_cn")
+    monkeypatch.delenv("TRADINGAGENTS_REPO", raising=False)
+    monkeypatch.delenv("STRATEGY_FACTORY_TRADINGAGENTS_COMMAND", raising=False)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/api/strategy/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configured_provider"] == "tradingagents_cn"
+    assert payload["effective_provider"] == "mock_rdq"
+    assert "repo-owned tradingagents-cn source not found" in (payload["reason"] or "").lower()
+
+    get_settings.cache_clear()
+
+
+def test_strategy_generation_uses_repo_owned_tradingagents_wrapper_in_validation_mode(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = configure_strategy_env(monkeypatch, tmp_path)
+    vendor_root = write_fake_vendored_tradingagents_repo(tmp_path).parent
+    monkeypatch.setenv("DSFC_STRATEGY_PROVIDER_VENDOR_ROOT", str(vendor_root))
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "tradingagents_cn")
+    monkeypatch.delenv("STRATEGY_FACTORY_TRADINGAGENTS_COMMAND", raising=False)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "vendored wrapper"},
+        )
+        generate_response = client.post(
+            "/api/strategy/generate",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "vendored wrapper"},
+        )
+
+    assert analysis_response.status_code == 200
+    assert generate_response.status_code == 200
+    artifact = generate_response.json()["artifact"]
+    artifact_dir = Path(artifact["directory"])
+    file_names = {Path(item["path"]).name for item in artifact["files"]}
+    assert artifact["effective_provider"] == "tradingagents_cn"
+    assert artifact_dir.parent == workspace.resolve()
+    assert "tradingagents-validation.md" in file_names
+    assert "tradingagents.run.json" in file_names
+    assert "tradingagents.stdout.log" in file_names
+    assert (artifact_dir / "tradingagents.stdout.log").read_text(encoding="utf-8").strip() == "generated tradingagents-validation.md"
 
     get_settings.cache_clear()
 

@@ -4,6 +4,8 @@ from urllib.parse import urlparse
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.strategy_providers import default_provider_command
+
 
 class Settings(BaseSettings):
     app_name: str = "dSFC-Quant"
@@ -27,9 +29,9 @@ class Settings(BaseSettings):
     strategy_factory_provider: str = "mock_rdq"
     strategy_factory_workspace: str = "./var/strategy_factory"
     strategy_factory_auto_generate: bool = False
-    strategy_factory_rd_agent_command: str = "rdagent fin_quant"
+    strategy_factory_rd_agent_command: str = default_provider_command("rd_agent_q")
     strategy_factory_rd_agent_timeout_seconds: float = 900.0
-    strategy_factory_tradingagents_command: str = "tradingagents"
+    strategy_factory_tradingagents_command: str = default_provider_command("tradingagents_cn")
     strategy_factory_tradingagents_timeout_seconds: float = 900.0
 
     exchange_id: str = "binance"

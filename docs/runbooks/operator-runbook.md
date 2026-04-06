@@ -11,6 +11,20 @@ cp .env.example .env
 docker compose up --build
 ```
 
+If you want the backend container to install the vendored strategy providers at
+build time, enable:
+
+```bash
+export INSTALL_STRATEGY_PROVIDERS=1
+docker compose up --build
+```
+
+For host-side setup, the repeatable sync command is:
+
+```bash
+PYTHON_BIN=./.venv/bin/python ./backend/scripts/install_strategy_providers.sh
+```
+
 ## 2. Verify health surfaces
 
 Open or curl:
@@ -71,29 +85,42 @@ python3 -m pytest -q backend/tests/test_market_runtime.py
 
 1. RD-Agent(Q) (Linux + Docker):
 
-   - Install from PyPI/source (`pip install rdagent` or `pip install -e /Users/suhui/Documents/百度同步/Project_Interest/RD-Agent`).
+   - Preferred local path: run `PYTHON_BIN=./.venv/bin/python ./backend/scripts/install_strategy_providers.sh`.
+   - The canonical vendored source directory is `backend/vendor/strategy_providers/rdagent`.
+   - If you keep the source elsewhere, set `RDAGENT_REPO=/absolute/path/to/RD-Agent` or `DSFC_STRATEGY_PROVIDER_VENDOR_ROOT=/absolute/path/to/strategy_providers`.
    - Confirm Docker is available via `docker run hello-world`.
    - Validate the repo-owned shim locally:
 
      ```bash
-     ./.runtime-venv/bin/python backend/scripts/run_rdagent.py --help
+     ./.venv/bin/python backend/scripts/run_rdagent.py --help
      ```
 
    - Enable the provider (`STRATEGY_FACTORY_ENABLED=true`, `STRATEGY_FACTORY_PROVIDER=rd_agent_q`) and let `/api/strategy/generate` or the auto-loop start.
-   - Check `GET /api/strategy/status` for `provider=rd_agent_q` with `availability=ready`. When Docker or the CLI fails, the backend reports the fallback reason instead of crashing.
+   - Check `GET /api/strategy/status` for `provider=rd_agent_q` with `availability=ready`. When Docker, imports, or the repo path fail, the backend reports the fallback reason instead of crashing.
 
 2. TradingAgents-CN (Python CLI):
 
-   - Install dependencies (`pip install -e /tmp/TradingAgents-CN` or `pip install tradingagents` once published).
+   - Preferred local path: run `PYTHON_BIN=./.venv/bin/python ./backend/scripts/install_strategy_providers.sh`.
+   - The canonical vendored source directory is `backend/vendor/strategy_providers/tradingagents_cn`.
+   - If you keep the source elsewhere, set `TRADINGAGENTS_REPO=/absolute/path/to/TradingAgents-CN` or `DSFC_STRATEGY_PROVIDER_VENDOR_ROOT=/absolute/path/to/strategy_providers`.
    - The upstream `tradingagents` console script is currently mispackaged. Validate the callable entrypoint through the repo shim instead:
 
      ```bash
-     ./.runtime-venv/bin/python backend/scripts/run_tradingagents.py help
+     ./.venv/bin/python backend/scripts/run_tradingagents.py help
      ```
 
-   - Switch to `STRATEGY_FACTORY_PROVIDER=tradingagents_cn` and set `STRATEGY_FACTORY_TRADINGAGENTS_COMMAND` to an explicit callable command. Treat this provider as honest beta wiring: CLI reachability can be validated now, while fully unattended generation may still need extra provider automation.
-   - `/api/strategy/status` should list `provider=tradingagents_cn` and log artifact files under `./var/strategy_factory/tradingagents-*` when successful.
+   - Switch to `STRATEGY_FACTORY_PROVIDER=tradingagents_cn` and keep `STRATEGY_FACTORY_TRADINGAGENTS_COMMAND` on the repo-owned wrapper unless you explicitly override it.
+   - `/api/strategy/status` should list `provider=tradingagents_cn` and log artifact files under `./var/strategy_factory/...` when successful.
+   - For unsupported symbols like `BTC/USDT`, the wrapper writes `tradingagents-validation.md` and exits truthfully instead of faking a full report.
    - Any missing CLI or exceptions are surfaced in the provider `reason` field to keep the system honest.
+
+3. Inspect provider artifacts after a run:
+
+   - `rdagent.input.json` / `tradingagents.input.json`
+   - `*.stdout.log`
+   - `*.stderr.log`
+   - `*.run.json`
+   - provider-generated markdown/json files
 
 ## 6. Inspect the dashboard
 

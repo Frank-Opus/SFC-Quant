@@ -13,6 +13,10 @@ coverage/
 frontend/vite.config.js
 frontend/vite.config.d.ts
 var/
+logs/
+log/
+backend/vendor/strategy_providers/*
+!backend/vendor/strategy_providers/.gitkeep
 
 .env
 .env.local

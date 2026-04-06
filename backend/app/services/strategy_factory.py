@@ -11,6 +11,13 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.core.config import Settings
+from app.core.strategy_providers import (
+    configured_provider_root,
+    provider_env_var,
+    provider_repo_root,
+    resolve_provider_repo,
+    wrapper_script_path,
+)
 from app.models.analysis import AnalysisRunResult
 from app.models.strategy import (
     AgentLogLevel,
@@ -755,11 +762,15 @@ class StrategyFactoryService:
         if command_issue is not None:
             return command_issue
 
-        if self._external_provider_requires_docker(spec) and not self._rd_agent_has_docker_access():
+        if self._external_provider_requires_docker(spec, command) and not self._rd_agent_has_docker_access():
             return (
                 f"Configured provider '{spec.provider}' is selected, but Docker daemon access is unavailable in this runtime. "
                 "Mount /var/run/docker.sock or set DOCKER_HOST for the backend container; local deterministic generation remains active."
             )
+
+        repo_reason = self._provider_repo_unavailable_reason(spec, command)
+        if repo_reason is not None:
+            return repo_reason
 
         return None
 
@@ -796,6 +807,46 @@ class StrategyFactoryService:
 
         return None
 
+    def _uses_repo_owned_wrapper(
+        self,
+        provider: StrategyProvider,
+        command: list[str],
+    ) -> bool:
+        wrapper_path = wrapper_script_path(provider)
+        for part in command[:2]:
+            candidate = Path(part).expanduser()
+            if candidate == wrapper_path:
+                return True
+            if candidate.exists() and candidate.resolve() == wrapper_path:
+                return True
+        return False
+
+    def _provider_repo_unavailable_reason(
+        self,
+        spec: ExternalProviderSpec,
+        command: list[str],
+    ) -> str | None:
+        if not self._uses_repo_owned_wrapper(spec.provider, command):
+            return None
+
+        resolved_repo = resolve_provider_repo(spec.provider)
+        if resolved_repo is not None:
+            return None
+
+        configured_root = configured_provider_root(spec.provider)
+        if configured_root is not None:
+            return (
+                f"Configured provider '{spec.provider}' is selected, but source repo was not found at {configured_root}. "
+                f"Fix {provider_env_var(spec.provider)} or install the provider into {provider_repo_root(spec.provider)}; "
+                "local deterministic generation remains active."
+            )
+
+        label = spec.label.lower()
+        return (
+            f"Configured provider '{spec.provider}' is selected, but repo-owned {label} source not found at {provider_repo_root(spec.provider)}. "
+            f"Install the provider there or set {provider_env_var(spec.provider)}; local deterministic generation remains active."
+        )
+
     def _script_argument_path(self, command: list[str]) -> Path | None:
         if len(command) < 2:
             return None
@@ -812,8 +863,14 @@ class StrategyFactoryService:
     def _external_provider_requires_docker(
         self,
         spec: ExternalProviderSpec,
+        command: list[str],
     ) -> bool:
-        return spec.requires_docker
+        if not spec.requires_docker:
+            return False
+        if self._uses_repo_owned_wrapper(spec.provider, command):
+            return True
+        executable_name = Path(command[0]).name.lower()
+        return executable_name == "rdagent"
 
     def _rd_agent_has_docker_access(self) -> bool:
         docker_host = os.environ.get("DOCKER_HOST", "").strip()

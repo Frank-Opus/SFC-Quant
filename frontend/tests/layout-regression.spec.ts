@@ -6,6 +6,7 @@ test("overview stays high-signal instead of embedding dedicated workspaces", asy
   const workspaceSurface = page.locator(".workspace-surface");
   await expect(workspaceSurface.getByTestId("thesis-panel")).toHaveCount(0);
   await expect(workspaceSurface.getByTestId("strategy-factory-panel")).toHaveCount(0);
+  await expect(workspaceSurface.getByTestId("section-truth-strip")).toHaveCount(0);
 });
 
 test("mobile navigation does not rely on horizontal scrolling", async ({ browser }) => {
