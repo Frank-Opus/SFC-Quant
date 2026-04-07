@@ -36,10 +36,9 @@ def _ensure_repo_on_path() -> Path:
 
 def _maybe_reexec_provider_venv() -> None:
     venv_python = DEFAULT_PROVIDER_VENV / "bin" / "python"
-    current_python = Path(sys.executable).resolve()
     if not venv_python.exists():
         return
-    if current_python == venv_python.resolve():
+    if Path(sys.prefix).resolve() == DEFAULT_PROVIDER_VENV.resolve():
         return
     os.execv(str(venv_python), [str(venv_python), __file__, *sys.argv[1:]])
 

@@ -26,14 +26,17 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && if [ -n "$BACKEND_EXTRAS" ]; then python -m pip install --no-cache-dir ".[${BACKEND_EXTRAS}]"; else python -m pip install --no-cache-dir .; fi \
     && mkdir -p "${DSFC_PROVIDER_VENV_ROOT}" \
     && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/rdagent ]; then \
-         python -m venv "${DSFC_PROVIDER_VENV_ROOT}/rdagent" \
+         python -m pip install --no-cache-dir -e ./vendor/strategy_providers/rdagent \
+         && python -m venv --system-site-packages "${DSFC_PROVIDER_VENV_ROOT}/rdagent" \
          && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir --upgrade pip \
-         && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir -e ./vendor/strategy_providers/rdagent; \
+         && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir "openai==2.30.0" \
+         && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir --no-deps -e ./vendor/strategy_providers/rdagent; \
        fi \
     && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/tradingagents_cn ]; then \
-         python -m venv "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn" \
+         python -m pip install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn \
+         && python -m venv --system-site-packages "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn" \
          && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir --upgrade pip \
-         && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn; \
+         && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir --no-deps -e ./vendor/strategy_providers/tradingagents_cn; \
        fi
 
 EXPOSE 8000
