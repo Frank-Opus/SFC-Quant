@@ -12,6 +12,8 @@ ARG NO_PROXY=""
 
 WORKDIR /app
 
+ENV DSFC_PROVIDER_VENV_ROOT=/opt/provider-venvs
+
 COPY pyproject.toml README.md ./
 COPY app ./app
 COPY scripts ./scripts
@@ -22,8 +24,17 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/* \
     && if [ -n "$BACKEND_EXTRAS" ]; then python -m pip install --no-cache-dir ".[${BACKEND_EXTRAS}]"; else python -m pip install --no-cache-dir .; fi \
-    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/rdagent ]; then python -m pip install --no-cache-dir -e ./vendor/strategy_providers/rdagent; fi \
-    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/tradingagents_cn ]; then python -m pip install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn; fi
+    && mkdir -p "${DSFC_PROVIDER_VENV_ROOT}" \
+    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/rdagent ]; then \
+         python -m venv "${DSFC_PROVIDER_VENV_ROOT}/rdagent" \
+         && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir --upgrade pip \
+         && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir -e ./vendor/strategy_providers/rdagent; \
+       fi \
+    && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/tradingagents_cn ]; then \
+         python -m venv "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn" \
+         && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir --upgrade pip \
+         && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn; \
+       fi
 
 EXPOSE 8000
 

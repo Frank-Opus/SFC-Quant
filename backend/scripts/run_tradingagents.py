@@ -8,6 +8,10 @@ from datetime import datetime
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PROVIDER_VENV = Path(
+    os.environ.get("TRADINGAGENTS_PROVIDER_VENV")
+    or f"{os.environ.get('DSFC_PROVIDER_VENV_ROOT', '/opt/provider-venvs')}/tradingagents_cn"
+)
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
@@ -28,6 +32,16 @@ def _ensure_repo_on_path() -> Path:
     raise SystemExit(
         "TradingAgents-CN repo not found. Set TRADINGAGENTS_REPO or install the source into backend/vendor/strategy_providers/tradingagents_cn."
     )
+
+
+def _maybe_reexec_provider_venv() -> None:
+    venv_python = DEFAULT_PROVIDER_VENV / "bin" / "python"
+    current_python = Path(sys.executable).resolve()
+    if not venv_python.exists():
+        return
+    if current_python == venv_python.resolve():
+        return
+    os.execv(str(venv_python), [str(venv_python), __file__, *sys.argv[1:]])
 
 
 def _looks_like_stock_symbol(symbol: str) -> bool:
@@ -134,6 +148,7 @@ def _run_bridge_mode() -> int:
 
 
 def main() -> int:
+    _maybe_reexec_provider_venv()
     _ensure_repo_on_path()
     if os.environ.get("DSFC_STRATEGY_INPUT_JSON") and os.environ.get("DSFC_STRATEGY_ARTIFACT_DIR"):
         return _run_bridge_mode()
