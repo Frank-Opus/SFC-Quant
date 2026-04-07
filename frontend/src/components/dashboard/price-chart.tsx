@@ -55,6 +55,35 @@ type SessionSegment = {
   stroke: string;
 };
 
+type SwingPoint = {
+  index: number;
+  time: UTCTimestamp;
+  price: number;
+  kind: "high" | "low";
+};
+
+type TrendSegment = {
+  startIndex: number;
+  endIndex: number;
+  startPrice: number;
+  endPrice: number;
+  label: string;
+  color: string;
+};
+
+type ZoneBand = {
+  fromPrice: number;
+  toPrice: number;
+  label: string;
+  fill: string;
+  stroke: string;
+};
+
+type StructureOverlayModel = {
+  trends: TrendSegment[];
+  zones: ZoneBand[];
+};
+
 const SESSION_META: Record<SessionKey, { label: string; fill: string; stroke: string }> = {
   asia: {
     label: "ASIA",
@@ -173,6 +202,151 @@ class SessionBandsPrimitive implements ISeriesPrimitive<Time> {
 
   setSegments(segments: SessionSegment[]): void {
     this.segments = segments;
+    this.requestUpdate?.();
+  }
+}
+
+class StructureOverlayRenderer implements IPrimitivePaneRenderer {
+  constructor(
+    private readonly getChart: () => IChartApi | null,
+    private readonly getSeries: () => ISeriesApi<"Candlestick"> | null,
+    private readonly getModel: () => StructureOverlayModel,
+  ) {}
+
+  draw(target: CanvasRenderingTarget2D): void {
+    const chart = this.getChart();
+    const series = this.getSeries();
+    if (!chart || !series) {
+      return;
+    }
+
+    const timeScale = chart.timeScale();
+    const model = this.getModel();
+
+    target.useMediaCoordinateSpace(({ context }) => {
+      context.save();
+      context.lineWidth = 1.5;
+      context.textBaseline = "bottom";
+      context.font = "600 10px IBM Plex Sans, sans-serif";
+
+      for (const trend of model.trends) {
+        const x1 = timeScale.logicalToCoordinate(trend.startIndex as Logical);
+        const x2 = timeScale.logicalToCoordinate(trend.endIndex as Logical);
+        const y1 = series.priceToCoordinate(trend.startPrice);
+        const y2 = series.priceToCoordinate(trend.endPrice);
+
+        if (x1 === null || x2 === null || y1 === null || y2 === null) {
+          continue;
+        }
+
+        context.strokeStyle = trend.color;
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+
+        context.fillStyle = trend.color;
+        context.fillText(trend.label, x2 + 8, y2 - 6);
+      }
+
+      context.restore();
+    });
+  }
+
+  drawBackground(target: CanvasRenderingTarget2D): void {
+    const series = this.getSeries();
+    if (!series) {
+      return;
+    }
+
+    const model = this.getModel();
+
+    target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+      context.save();
+      context.textBaseline = "top";
+      context.font = "600 10px IBM Plex Sans, sans-serif";
+
+      for (const zone of model.zones) {
+        const top = series.priceToCoordinate(zone.toPrice);
+        const bottom = series.priceToCoordinate(zone.fromPrice);
+
+        if (top === null || bottom === null) {
+          continue;
+        }
+
+        const y1 = Math.max(0, Math.min(top, bottom));
+        const y2 = Math.min(mediaSize.height, Math.max(top, bottom));
+        const height = y2 - y1;
+
+        if (height <= 1) {
+          continue;
+        }
+
+        context.fillStyle = zone.fill;
+        context.fillRect(0, y1, mediaSize.width, height);
+
+        context.strokeStyle = zone.stroke;
+        context.lineWidth = 1;
+        context.strokeRect(0.5, y1 + 0.5, mediaSize.width - 1, Math.max(height - 1, 0));
+
+        context.fillStyle = zone.stroke;
+        context.fillText(zone.label, 8, y1 + 8);
+      }
+
+      context.restore();
+    });
+  }
+}
+
+class StructureOverlayPaneView implements IPrimitivePaneView {
+  private readonly paneRenderer: StructureOverlayRenderer;
+
+  constructor(
+    getChart: () => IChartApi | null,
+    getSeries: () => ISeriesApi<"Candlestick"> | null,
+    getModel: () => StructureOverlayModel,
+  ) {
+    this.paneRenderer = new StructureOverlayRenderer(getChart, getSeries, getModel);
+  }
+
+  zOrder(): "normal" {
+    return "normal";
+  }
+
+  renderer(): IPrimitivePaneRenderer {
+    return this.paneRenderer;
+  }
+}
+
+class StructureOverlayPrimitive implements ISeriesPrimitive<Time> {
+  private chart: IChartApi | null = null;
+  private series: ISeriesApi<"Candlestick"> | null = null;
+  private model: StructureOverlayModel = { trends: [], zones: [] };
+  private requestUpdate: (() => void) | null = null;
+  private readonly paneView = new StructureOverlayPaneView(
+    () => this.chart,
+    () => this.series,
+    () => this.model,
+  );
+
+  attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
+    this.chart = chart as IChartApi;
+    this.series = series as ISeriesApi<"Candlestick">;
+    this.requestUpdate = requestUpdate;
+  }
+
+  detached(): void {
+    this.chart = null;
+    this.series = null;
+    this.requestUpdate = null;
+  }
+
+  paneViews(): readonly IPrimitivePaneView[] {
+    return [this.paneView];
+  }
+
+  setModel(model: StructureOverlayModel): void {
+    this.model = model;
     this.requestUpdate?.();
   }
 }
@@ -316,12 +490,12 @@ function buildVwapSeries(candles: Candle[]) {
   });
 }
 
-function buildSwingMarkers(candles: Candle[]): SeriesMarker<Time>[] {
+function buildSwingPoints(candles: Candle[]): SwingPoint[] {
   if (candles.length < 5) {
     return [];
   }
 
-  const markers: SeriesMarker<Time>[] = [];
+  const points: SwingPoint[] = [];
 
   for (let index = 2; index < candles.length - 2; index += 1) {
     const current = candles[index];
@@ -343,27 +517,101 @@ function buildSwingMarkers(candles: Candle[]): SeriesMarker<Time>[] {
       current.low < rightTwo.low;
 
     if (isSwingHigh) {
-      markers.push({
+      points.push({
+        index,
         time: toChartTime(current.timestamp),
-        position: "aboveBar",
-        shape: "circle",
-        color: "rgba(255, 196, 107, 0.95)",
-        text: "SH",
+        price: current.high,
+        kind: "high",
       });
     }
 
     if (isSwingLow) {
-      markers.push({
+      points.push({
+        index,
         time: toChartTime(current.timestamp),
-        position: "belowBar",
-        shape: "circle",
-        color: "rgba(120, 179, 255, 0.95)",
-        text: "SL",
+        price: current.low,
+        kind: "low",
       });
     }
   }
 
-  return markers.slice(-24);
+  return points;
+}
+
+function buildSwingMarkers(points: SwingPoint[]): SeriesMarker<Time>[] {
+  return points
+    .map((point) => ({
+      time: point.time,
+      position: point.kind === "high" ? ("aboveBar" as const) : ("belowBar" as const),
+      shape: "circle" as const,
+      color:
+        point.kind === "high" ? "rgba(255, 196, 107, 0.95)" : "rgba(120, 179, 255, 0.95)",
+      text: point.kind === "high" ? "SH" : "SL",
+    }))
+    .slice(-24);
+}
+
+function buildStructureOverlay(candles: Candle[], swings: SwingPoint[]): StructureOverlayModel {
+  if (candles.length === 0) {
+    return { trends: [], zones: [] };
+  }
+
+  const highs = swings.filter((point) => point.kind === "high");
+  const lows = swings.filter((point) => point.kind === "low");
+  const recentWindow = candles.slice(-Math.min(candles.length, 48));
+  const averageRange =
+    recentWindow.reduce((sum, candle) => sum + (candle.high - candle.low), 0) /
+    Math.max(recentWindow.length, 1);
+  const zonePadding = Math.max(averageRange * 0.35, (candles.at(-1)?.close ?? 0) * 0.0025);
+
+  const trends: TrendSegment[] = [];
+  const zones: ZoneBand[] = [];
+
+  const recentHighs = highs.slice(-2);
+  if (recentHighs.length === 2) {
+    trends.push({
+      startIndex: recentHighs[0].index,
+      endIndex: recentHighs[1].index,
+      startPrice: recentHighs[0].price,
+      endPrice: recentHighs[1].price,
+      label: "RESIST TREND",
+      color: "rgba(255, 196, 107, 0.9)",
+    });
+
+    const resistanceCenter =
+      recentHighs.reduce((sum, point) => sum + point.price, 0) / recentHighs.length;
+    zones.push({
+      fromPrice: resistanceCenter - zonePadding,
+      toPrice: resistanceCenter + zonePadding,
+      label: "RESISTANCE",
+      fill: "rgba(255, 196, 107, 0.06)",
+      stroke: "rgba(255, 196, 107, 0.18)",
+    });
+  }
+
+  const recentLows = lows.slice(-2);
+  if (recentLows.length === 2) {
+    trends.push({
+      startIndex: recentLows[0].index,
+      endIndex: recentLows[1].index,
+      startPrice: recentLows[0].price,
+      endPrice: recentLows[1].price,
+      label: "SUPPORT TREND",
+      color: "rgba(120, 179, 255, 0.92)",
+    });
+
+    const supportCenter =
+      recentLows.reduce((sum, point) => sum + point.price, 0) / recentLows.length;
+    zones.push({
+      fromPrice: supportCenter - zonePadding,
+      toPrice: supportCenter + zonePadding,
+      label: "SUPPORT",
+      fill: "rgba(120, 179, 255, 0.055)",
+      stroke: "rgba(120, 179, 255, 0.18)",
+    });
+  }
+
+  return { trends, zones };
 }
 
 export function PriceChart({
@@ -385,6 +633,7 @@ export function PriceChart({
   const markerApiRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const structureLinesRef = useRef<IPriceLine[]>([]);
   const sessionBandsPrimitiveRef = useRef<SessionBandsPrimitive | null>(null);
+  const structureOverlayPrimitiveRef = useRef<StructureOverlayPrimitive | null>(null);
   const chartKeyRef = useRef<string>("");
   const candleLookupRef = useRef<Map<UTCTimestamp, Candle>>(new Map());
   const visibleRangeRef = useRef<LogicalRange | null>(null);
@@ -432,7 +681,12 @@ export function PriceChart({
   const emaFastData = useMemo(() => buildEmaSeries(candles, 9), [candles]);
   const emaSlowData = useMemo(() => buildEmaSeries(candles, 21), [candles]);
   const vwapData = useMemo(() => buildVwapSeries(candles), [candles]);
-  const swingMarkerData = useMemo(() => buildSwingMarkers(candles), [candles]);
+  const swingPoints = useMemo(() => buildSwingPoints(candles), [candles]);
+  const swingMarkerData = useMemo(() => buildSwingMarkers(swingPoints), [swingPoints]);
+  const structureOverlay = useMemo(
+    () => buildStructureOverlay(candles, swingPoints),
+    [candles, swingPoints],
+  );
   const markerData = useMemo(
     () => [...externalMarkerData, ...swingMarkerData],
     [externalMarkerData, swingMarkerData],
@@ -676,7 +930,9 @@ export function PriceChart({
     vwapSeriesRef.current = vwapSeries;
     markerApiRef.current = createSeriesMarkers(candleSeries, []);
     sessionBandsPrimitiveRef.current = new SessionBandsPrimitive();
+    structureOverlayPrimitiveRef.current = new StructureOverlayPrimitive();
     candleSeries.attachPrimitive(sessionBandsPrimitiveRef.current);
+    candleSeries.attachPrimitive(structureOverlayPrimitiveRef.current);
     const handleCrosshairMove = (param: { time?: Time }) => {
       if (!param.time || typeof param.time !== "number") {
         setHoveredTime(null);
@@ -706,6 +962,9 @@ export function PriceChart({
       if (sessionBandsPrimitiveRef.current) {
         candleSeries.detachPrimitive(sessionBandsPrimitiveRef.current);
       }
+      if (structureOverlayPrimitiveRef.current) {
+        candleSeries.detachPrimitive(structureOverlayPrimitiveRef.current);
+      }
       markerApiRef.current = null;
       structureLinesRef.current = [];
       candleSeriesRef.current = null;
@@ -714,6 +973,7 @@ export function PriceChart({
       emaSlowSeriesRef.current = null;
       vwapSeriesRef.current = null;
       sessionBandsPrimitiveRef.current = null;
+      structureOverlayPrimitiveRef.current = null;
       chartRef.current?.remove();
       chartRef.current = null;
     };
@@ -727,6 +987,7 @@ export function PriceChart({
     vwapSeriesRef.current?.setData(vwapData);
     markerApiRef.current?.setMarkers(markerData);
     sessionBandsPrimitiveRef.current?.setSegments(sessionSegments);
+    structureOverlayPrimitiveRef.current?.setModel(structureOverlay);
     candleLookupRef.current = candleLookup;
 
     const nextKey = `${symbol}:${timeframe}`;
@@ -751,6 +1012,7 @@ export function PriceChart({
     emaSlowData,
     markerData,
     sessionSegments,
+    structureOverlay,
     symbol,
     timeframe,
     vwapData,
@@ -872,6 +1134,14 @@ export function PriceChart({
         <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-vwap" />
           VWAP
+        </span>
+        <span className="chart-legend-item">
+          <i className="chart-legend-swatch chart-legend-swatch-support" />
+          SUPPORT
+        </span>
+        <span className="chart-legend-item">
+          <i className="chart-legend-swatch chart-legend-swatch-resistance" />
+          RESISTANCE
         </span>
         <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-asia" />

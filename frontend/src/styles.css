@@ -530,6 +530,14 @@ button {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.chart-legend-swatch-support {
+  background: rgba(120, 179, 255, 0.85);
+}
+
+.chart-legend-swatch-resistance {
+  background: rgba(255, 196, 107, 0.9);
+}
+
 .chart-legend-swatch-asia {
   background: rgba(120, 180, 255, 0.4);
 }
