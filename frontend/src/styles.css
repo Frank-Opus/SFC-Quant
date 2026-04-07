@@ -475,6 +475,168 @@ button {
   height: 220px;
 }
 
+.chart-toolbar,
+.chart-toolbar-group,
+.chart-stats,
+.chart-footnote {
+  display: flex;
+  align-items: center;
+}
+
+.chart-toolbar,
+.chart-stats {
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.chart-toolbar-group {
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chart-legend-swatch {
+  width: 1.2rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.chart-legend-swatch-ema-fast {
+  background: rgba(255, 196, 107, 0.92);
+}
+
+.chart-legend-swatch-ema-slow {
+  background: rgba(120, 179, 255, 0.92);
+}
+
+.chart-legend-swatch-vwap {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.chart-legend-swatch-asia {
+  background: rgba(120, 180, 255, 0.4);
+}
+
+.chart-legend-swatch-london {
+  background: rgba(255, 196, 107, 0.42);
+}
+
+.chart-legend-swatch-newyork {
+  background: rgba(130, 255, 190, 0.4);
+}
+
+.chart-chip {
+  padding: 0.46rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.chart-chip:hover,
+.chart-chip[data-active="true"] {
+  color: var(--text-main);
+  border-color: rgba(121, 243, 255, 0.28);
+  background: linear-gradient(180deg, rgba(121, 243, 255, 0.12), rgba(255, 255, 255, 0.04));
+  transform: translateY(-1px);
+}
+
+.chart-chip-secondary {
+  color: var(--accent-cyan);
+}
+
+.chart-stats {
+  padding: 0.85rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(121, 243, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(4, 10, 20, 0.68);
+}
+
+.chart-stat {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.chart-stat span {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.chart-stat strong {
+  font-size: 0.92rem;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.chart-stat-time {
+  min-width: min(100%, 15rem);
+}
+
+.chart-footnote {
+  justify-content: space-between;
+  gap: 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.chart-structure-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.chart-structure-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.chart-structure-pill-high {
+  border-color: rgba(130, 255, 190, 0.18);
+  color: rgba(130, 255, 190, 0.92);
+}
+
+.chart-structure-pill-low {
+  border-color: rgba(255, 133, 120, 0.18);
+  color: rgba(255, 133, 120, 0.92);
+}
+
 .kpi-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

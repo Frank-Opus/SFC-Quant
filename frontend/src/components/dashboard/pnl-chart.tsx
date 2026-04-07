@@ -5,6 +5,7 @@ import {
   LineStyle,
   createChart,
   type IChartApi,
+  type LogicalRange,
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -18,10 +19,24 @@ type PnlChartProps = {
   averageEntryPrice: number;
   realizedPnl: number;
   offsetPnl: number;
+  visibleRange?: LogicalRange | null;
+  onVisibleRangeChange?: (range: LogicalRange | null) => void;
 };
 
 function toChartTime(value: string): UTCTimestamp {
   return Math.floor(new Date(value).getTime() / 1000) as UTCTimestamp;
+}
+
+function sameLogicalRange(left: LogicalRange | null, right: LogicalRange | null): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return Math.abs(left.from - right.from) < 0.001 && Math.abs(left.to - right.to) < 0.001;
 }
 
 export function PnlChart({
@@ -30,11 +45,14 @@ export function PnlChart({
   averageEntryPrice,
   realizedPnl,
   offsetPnl,
+  visibleRange = null,
+  onVisibleRangeChange,
 }: PnlChartProps) {
   const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const visibleRangeRef = useRef<LogicalRange | null>(null);
 
   const seriesData = useMemo(
     () =>
@@ -67,9 +85,33 @@ export function PnlChart({
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.08)",
       },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: {
+          time: true,
+          price: false,
+        },
+        axisDoubleClickReset: {
+          time: true,
+          price: true,
+        },
+      },
       timeScale: {
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
+        rightOffset: 6,
+        barSpacing: 10,
+        minBarSpacing: 0.35,
+        maxBarSpacing: 42,
+        rightBarStaysOnScroll: true,
+        lockVisibleTimeRangeOnResize: true,
       },
     });
 
@@ -86,23 +128,44 @@ export function PnlChart({
     chartRef.current = chart;
     seriesRef.current = series;
 
-    const observer = new ResizeObserver(() => {
-      chart.timeScale().fitContent();
-    });
-    observer.observe(containerRef.current);
+    const handleVisibleLogicalRangeChange = (range: LogicalRange | null) => {
+      visibleRangeRef.current = range;
+      onVisibleRangeChange?.(range);
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleLogicalRangeChange);
 
     return () => {
-      observer.disconnect();
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleLogicalRangeChange);
       seriesRef.current = null;
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, []);
+  }, [onVisibleRangeChange]);
 
   useEffect(() => {
     seriesRef.current?.setData(seriesData);
-    chartRef.current?.timeScale().fitContent();
   }, [seriesData]);
+
+  useEffect(() => {
+    if (!chartRef.current) {
+      return;
+    }
+
+    if (visibleRange === null) {
+      if (seriesData.length > 0) {
+        chartRef.current.timeScale().fitContent();
+      }
+      return;
+    }
+
+    if (sameLogicalRange(visibleRangeRef.current, visibleRange)) {
+      return;
+    }
+
+    visibleRangeRef.current = visibleRange;
+    chartRef.current.timeScale().setVisibleLogicalRange(visibleRange);
+  }, [seriesData.length, visibleRange]);
 
   return (
     <div className="chart-shell pnl-shell">

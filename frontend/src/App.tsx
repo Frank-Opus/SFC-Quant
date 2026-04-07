@@ -1,5 +1,6 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
 import { motion } from "framer-motion";
+import type { LogicalRange } from "lightweight-charts";
 import {
   Activity,
   AlertTriangle,
@@ -17,7 +18,7 @@ import {
   ShieldCheck,
   Slash,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PnlChart } from "./components/dashboard/pnl-chart";
 import { AgentRuntimePanel } from "./components/dashboard/agent-runtime-panel";
@@ -439,6 +440,7 @@ export default function App() {
   } = useMarketRuntime();
   const [liveConfirmationText, setLiveConfirmationText] = useState("");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>("overview");
+  const [marketChartRange, setMarketChartRange] = useState<LogicalRange | null>(null);
 
   const viewModel = useMemo(
     () =>
@@ -589,6 +591,10 @@ export default function App() {
   );
 
   const thesisEvents = useMemo(() => eventFeed.slice(0, 8), [eventFeed]);
+
+  useEffect(() => {
+    setMarketChartRange(null);
+  }, [selectedMarket?.symbol, selectedMarket?.timeframe]);
 
   const heatmapCells = useMemo<HeatmapCell[]>(
     () =>
@@ -1040,15 +1046,19 @@ export default function App() {
             <PriceChart
               candles={selectedMarket.candles}
               markers={priceMarkers}
+              onVisibleRangeChange={setMarketChartRange}
               symbol={selectedMarket.symbol}
               timeframe={selectedMarket.timeframe}
+              visibleRange={marketChartRange}
             />
             <PnlChart
               candles={selectedMarket.candles}
               quantity={selectedPosition?.quantity ?? 0}
               averageEntryPrice={selectedPosition?.avg_entry_price ?? selectedMarket.last_price}
+              onVisibleRangeChange={setMarketChartRange}
               realizedPnl={risk.daily_realized_pnl}
               offsetPnl={nonSelectedUnrealized}
+              visibleRange={marketChartRange}
             />
           </>
         ) : (
