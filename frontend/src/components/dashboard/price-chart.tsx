@@ -84,6 +84,10 @@ type StructureOverlayModel = {
   zones: ZoneBand[];
 };
 
+type ChartLayerKey = "ema" | "vwap" | "sessions" | "structure" | "range";
+
+type ChartLayerState = Record<ChartLayerKey, boolean>;
+
 const SESSION_META: Record<SessionKey, { label: string; fill: string; stroke: string }> = {
   asia: {
     label: "ASIA",
@@ -640,6 +644,13 @@ export function PriceChart({
   const [activePreset, setActivePreset] = useState<RangePresetId>("live");
   const [hoveredTime, setHoveredTime] = useState<UTCTimestamp | null>(null);
   const [localVisibleRange, setLocalVisibleRange] = useState<LogicalRange | null>(null);
+  const [layerState, setLayerState] = useState<ChartLayerState>({
+    ema: true,
+    vwap: true,
+    sessions: true,
+    structure: true,
+    range: true,
+  });
 
   const candleData = useMemo(
     () =>
@@ -688,8 +699,8 @@ export function PriceChart({
     [candles, swingPoints],
   );
   const markerData = useMemo(
-    () => [...externalMarkerData, ...swingMarkerData],
-    [externalMarkerData, swingMarkerData],
+    () => [...externalMarkerData, ...(layerState.structure ? swingMarkerData : [])],
+    [externalMarkerData, layerState.structure, swingMarkerData],
   );
   const sessionSegments = useMemo(() => buildSessionSegments(candles), [candles]);
 
@@ -811,6 +822,13 @@ export function PriceChart({
       rangePct,
     };
   }, [candles, localVisibleRange]);
+
+  const toggleLayer = useCallback((layer: ChartLayerKey) => {
+    setLayerState((current) => ({
+      ...current,
+      [layer]: !current[layer],
+    }));
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -982,12 +1000,14 @@ export function PriceChart({
   useEffect(() => {
     candleSeriesRef.current?.setData(candleData);
     volumeSeriesRef.current?.setData(volumeData);
-    emaFastSeriesRef.current?.setData(emaFastData);
-    emaSlowSeriesRef.current?.setData(emaSlowData);
-    vwapSeriesRef.current?.setData(vwapData);
+    emaFastSeriesRef.current?.setData(layerState.ema ? emaFastData : []);
+    emaSlowSeriesRef.current?.setData(layerState.ema ? emaSlowData : []);
+    vwapSeriesRef.current?.setData(layerState.vwap ? vwapData : []);
     markerApiRef.current?.setMarkers(markerData);
-    sessionBandsPrimitiveRef.current?.setSegments(sessionSegments);
-    structureOverlayPrimitiveRef.current?.setModel(structureOverlay);
+    sessionBandsPrimitiveRef.current?.setSegments(layerState.sessions ? sessionSegments : []);
+    structureOverlayPrimitiveRef.current?.setModel(
+      layerState.structure ? structureOverlay : { trends: [], zones: [] },
+    );
     candleLookupRef.current = candleLookup;
 
     const nextKey = `${symbol}:${timeframe}`;
@@ -1010,6 +1030,10 @@ export function PriceChart({
     candleLookup,
     emaFastData,
     emaSlowData,
+    layerState.ema,
+    layerState.sessions,
+    layerState.structure,
+    layerState.vwap,
     markerData,
     sessionSegments,
     structureOverlay,
@@ -1048,7 +1072,7 @@ export function PriceChart({
     }
     structureLinesRef.current = [];
 
-    if (!visibleWindowStats) {
+    if (!visibleWindowStats || !layerState.range) {
       return;
     }
 
@@ -1077,7 +1101,7 @@ export function PriceChart({
       }
       structureLinesRef.current = [];
     };
-  }, [visibleWindowStats]);
+  }, [layerState.range, visibleWindowStats]);
 
   const interactionButtons = [
     ...rangePresets.map((preset) => ({
@@ -1122,39 +1146,59 @@ export function PriceChart({
           </button>
         </div>
       </div>
+      <div className="chart-control-panel">
+        <span className="chart-control-title">{t("chart.price.layers")}</span>
+        <div className="chart-toolbar-group">
+          <button className="chart-chip" data-active={layerState.ema} onClick={() => toggleLayer("ema")} type="button">
+            {t("chart.price.layer.ema")}
+          </button>
+          <button className="chart-chip" data-active={layerState.vwap} onClick={() => toggleLayer("vwap")} type="button">
+            {t("chart.price.layer.vwap")}
+          </button>
+          <button className="chart-chip" data-active={layerState.sessions} onClick={() => toggleLayer("sessions")} type="button">
+            {t("chart.price.layer.sessions")}
+          </button>
+          <button className="chart-chip" data-active={layerState.structure} onClick={() => toggleLayer("structure")} type="button">
+            {t("chart.price.layer.structure")}
+          </button>
+          <button className="chart-chip" data-active={layerState.range} onClick={() => toggleLayer("range")} type="button">
+            {t("chart.price.layer.range")}
+          </button>
+        </div>
+      </div>
       <div className="chart-legend">
-        <span className="chart-legend-item">
+        {layerState.ema ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-ema-fast" />
           EMA 9
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.ema ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-ema-slow" />
           EMA 21
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.vwap ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-vwap" />
           VWAP
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.structure ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-support" />
           SUPPORT
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.structure ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-resistance" />
           RESISTANCE
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.sessions ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-asia" />
           ASIA
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.sessions ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-london" />
           LONDON
-        </span>
-        <span className="chart-legend-item">
+        </span> : null}
+        {layerState.sessions ? <span className="chart-legend-item">
           <i className="chart-legend-swatch chart-legend-swatch-newyork" />
           NEW YORK
-        </span>
+        </span> : null}
       </div>
       {activeCandle ? (
         <div className="chart-stats">
@@ -1192,19 +1236,19 @@ export function PriceChart({
       ) : null}
       {visibleWindowStats ? (
         <div className="chart-structure-strip">
-          <span className="chart-structure-pill chart-structure-pill-high">
+          {layerState.range ? <span className="chart-structure-pill chart-structure-pill-high">
             Range High {formatNumber(visibleWindowStats.high, 2)}
-          </span>
-          <span className="chart-structure-pill chart-structure-pill-low">
+          </span> : null}
+          {layerState.range ? <span className="chart-structure-pill chart-structure-pill-low">
             Range Low {formatNumber(visibleWindowStats.low, 2)}
-          </span>
+          </span> : null}
           <span className="chart-structure-pill">
             Window {visibleWindowStats.bars} bars
           </span>
           <span className="chart-structure-pill">
             Span {formatNumber(visibleWindowStats.range, 2)} / {formatNumber(visibleWindowStats.rangePct * 100, 2)}%
           </span>
-          {activeVwap !== null ? (
+          {layerState.vwap && activeVwap !== null ? (
             <span className="chart-structure-pill">
               VWAP {formatNumber(activeVwap, 2)} / {formatNumber(vwapDelta ?? 0, 2)}
             </span>
