@@ -373,6 +373,9 @@ class DispatchDecision:
     reason: str
 
 
+RECENT_ANALYSIS_REUSE_SECONDS = 180.0
+
+
 class ExecutionService:
     def __init__(
         self,
@@ -449,14 +452,16 @@ class ExecutionService:
         return self.status()
 
     async def dispatch(self, payload: ExecutionDispatchRequest) -> ExecutionDispatchResult:
-        analysis = await self._analysis_service.run_analysis(
-            AnalysisRunRequest(
-                symbol=payload.symbol,
-                timeframe=payload.timeframe,
-                notes=payload.notes,
-            ),
-            trigger="manual",
-        )
+        analysis = self._resolve_reusable_analysis(payload)
+        if analysis is None:
+            analysis = await self._analysis_service.run_analysis(
+                AnalysisRunRequest(
+                    symbol=payload.symbol,
+                    timeframe=payload.timeframe,
+                    notes=payload.notes,
+                ),
+                trigger="manual",
+            )
         self._last_run_id = analysis.run_id
         self._mark_to_market(
             symbol=analysis.symbol,
@@ -586,6 +591,26 @@ class ExecutionService:
             order=order,
             status=self.status(),
         )
+
+    def _resolve_reusable_analysis(
+        self,
+        payload: ExecutionDispatchRequest,
+    ) -> AnalysisRunResult | None:
+        if not payload.reuse_latest_analysis:
+            return None
+
+        latest = self._analysis_service.latest_analysis(
+            symbol=payload.symbol,
+            timeframe=payload.timeframe,
+        )
+        if latest is None:
+            return None
+
+        age_seconds = (datetime.now(timezone.utc) - latest.completed_at).total_seconds()
+        if age_seconds < 0 or age_seconds > RECENT_ANALYSIS_REUSE_SECONDS:
+            return None
+
+        return latest
 
     async def _create_and_fill_order(
         self,

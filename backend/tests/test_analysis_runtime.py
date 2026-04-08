@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.main import app
+from app.services.market import CcxtMarketDataAdapter
 from app.services.providers import (
     OpenAICompatibleProvider,
     ProviderFactory,
@@ -216,6 +217,38 @@ def test_analysis_falls_back_to_mock_when_provider_errors(monkeypatch, tmp_path:
     payload = response.json()
     assert payload["status"] == "fallback"
     assert all(output["provider"] == "mock" for output in payload["outputs"])
+    assert all(output["status"] == "fallback" for output in payload["outputs"])
+
+    get_settings.cache_clear()
+
+
+def test_analysis_returns_fallback_when_real_market_is_unavailable(monkeypatch, tmp_path: Path) -> None:
+    configure_analysis_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("MARKET_DATA_MODE", "real")
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    async def fail_fetch_market_snapshot(
+        self, *, symbol: str, timeframe: str, history_limit: int, exchange_id: str
+    ):
+        raise RuntimeError("binance GET https://api.binance.com/api/v3/exchangeInfo")
+
+    monkeypatch.setattr(
+        CcxtMarketDataAdapter,
+        "fetch_market_snapshot",
+        fail_fetch_market_snapshot,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "fallback"
+    assert payload["market_snapshot"]["source"] == "mock"
     assert all(output["status"] == "fallback" for output in payload["outputs"])
 
     get_settings.cache_clear()

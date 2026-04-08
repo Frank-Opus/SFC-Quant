@@ -21,6 +21,7 @@ class ExecutionDispatchRequest(BaseModel):
     symbol: str
     timeframe: str = "1m"
     notes: str | None = None
+    reuse_latest_analysis: bool = True
 
 
 class ExecutionOrder(BaseModel):

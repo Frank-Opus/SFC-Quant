@@ -30,6 +30,7 @@ import {
   type AnalysisRunResult,
   type EventEnvelope,
   type ExecutionStatusResponse,
+  type MarketDataRuntime,
   type MarketSnapshot,
   type MarketSnapshotResponse,
   type PerformanceReport,
@@ -88,6 +89,13 @@ const DEFAULT_INSTRUMENT: InstrumentSelection = {
   symbol: "BTC/USDT",
   timeframe: "1m",
 };
+
+function canRequestBacktest(marketData: MarketDataRuntime | null | undefined): boolean {
+  if (!marketData) {
+    return false;
+  }
+  return marketData.effective_source !== "unavailable";
+}
 
 function clampEvents(events: EventEnvelope[]): EventEnvelope[] {
   const seen = new Set<string>();
@@ -236,20 +244,31 @@ export function useMarketRuntime(): MarketRuntimeState {
     setPaperPerformance(next);
   }, []);
 
-  const refreshBacktest = useCallback(async (selection: InstrumentSelection) => {
-    try {
-      const next = await runBacktest(selection);
-      if (!activeRef.current) {
+  const refreshBacktest = useCallback(
+    async (selection: InstrumentSelection, marketData?: MarketDataRuntime | null) => {
+      if (!canRequestBacktest(marketData ?? snapshot.market_data ?? snapshot.runtime?.market_data)) {
+        if (!activeRef.current) {
+          return;
+        }
+        setBacktestReport(null);
         return;
       }
-      setBacktestReport(next);
-    } catch {
-      if (!activeRef.current) {
-        return;
+
+      try {
+        const next = await runBacktest(selection);
+        if (!activeRef.current) {
+          return;
+        }
+        setBacktestReport(next);
+      } catch {
+        if (!activeRef.current) {
+          return;
+        }
+        setBacktestReport(null);
       }
-      setBacktestReport(null);
-    }
-  }, []);
+    },
+    [snapshot.market_data, snapshot.runtime?.market_data],
+  );
 
   const refreshAnalysis = useCallback(async (selection: InstrumentSelection) => {
     const next = await loadLatestAnalysis(selection);
@@ -302,6 +321,7 @@ export function useMarketRuntime(): MarketRuntimeState {
     setEventFeed(clampEvents(nextSnapshot.recent_events));
     setSelectedInstrumentState(resolvedInstrument);
 
+    const nextMarketData = nextSnapshot.market_data ?? nextSnapshot.runtime?.market_data;
     const [nextAnalysis, nextStrategyArtifacts, nextBacktest, nextWorkflow] = await Promise.all([
       loadLatestAnalysis(resolvedInstrument),
       loadStrategyArtifacts({
@@ -309,7 +329,7 @@ export function useMarketRuntime(): MarketRuntimeState {
         timeframe: resolvedInstrument.timeframe,
         limit: 6,
       }),
-      runBacktest(resolvedInstrument).catch(() => null),
+      canRequestBacktest(nextMarketData) ? runBacktest(resolvedInstrument).catch(() => null) : Promise.resolve(null),
       loadWorkflowSnapshot(resolvedInstrument),
     ]);
     if (!activeRef.current) {
@@ -338,8 +358,8 @@ export function useMarketRuntime(): MarketRuntimeState {
   }, [refreshStrategy, selectedInstrument]);
 
   useEffect(() => {
-    void refreshBacktest(selectedInstrument);
-  }, [refreshBacktest, selectedInstrument]);
+    void refreshBacktest(selectedInstrument, snapshot.market_data ?? snapshot.runtime?.market_data);
+  }, [refreshBacktest, selectedInstrument, snapshot.market_data, snapshot.runtime]);
 
   useEffect(() => {
     activeRef.current = true;

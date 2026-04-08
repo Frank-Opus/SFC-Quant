@@ -257,7 +257,13 @@ class PerformanceService:
     async def run_backtest(self, payload: BacktestRunRequest) -> PerformanceReport:
         symbol = payload.symbol or self._settings.market_symbols[0]
         timeframe = payload.timeframe or self._settings.market_timeframes[0]
-        snapshot = await self._market_service.ensure_snapshot(symbol=symbol, timeframe=timeframe)
+        try:
+            snapshot = await self._market_service.ensure_snapshot(symbol=symbol, timeframe=timeframe)
+        except RuntimeError:
+            snapshot = await self._market_service.build_fallback_snapshot(
+                symbol=symbol,
+                timeframe=timeframe,
+            )
         candles = snapshot.candles
         seeded_at = candles[0].timestamp if candles else datetime.now(timezone.utc)
         ledger = PaperPerformanceLedger(

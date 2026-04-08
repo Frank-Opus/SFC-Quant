@@ -235,6 +235,19 @@ class MarketRuntimeService:
         )
         return snapshot
 
+    async def build_fallback_snapshot(
+        self,
+        *,
+        symbol: str,
+        timeframe: str,
+    ) -> MarketSnapshot:
+        return await self._mock_adapter.fetch_market_snapshot(
+            symbol=symbol,
+            timeframe=timeframe,
+            history_limit=self._settings.market_history_limit,
+            exchange_id=self._settings.exchange_id,
+        )
+
     def market_data_runtime(self) -> MarketDataRuntime:
         requested_source = "ccxt" if self._settings.market_data_mode == "real" else "mock"
         mode = self._settings.market_data_mode

@@ -180,6 +180,36 @@ def test_execution_dispatch_creates_filled_paper_order(monkeypatch, tmp_path: Pa
     get_settings.cache_clear()
 
 
+def test_execution_dispatch_reuses_latest_recent_analysis_by_default(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_execution_env(monkeypatch, tmp_path)
+    run_analysis_calls = {"count": 0}
+
+    async def fake_run_analysis(self, request, *, trigger="manual"):
+        run_analysis_calls["count"] += 1
+        return _make_analysis_result("buy")
+
+    monkeypatch.setattr(AnalysisService, "run_analysis", fake_run_analysis)
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+        dispatch_response = client.post(
+            "/api/execution/dispatch",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert analysis_response.status_code == 200
+    assert dispatch_response.status_code == 200
+    assert dispatch_response.json()["order"]["status"] == "filled"
+    assert run_analysis_calls["count"] == 1
+
+    get_settings.cache_clear()
+
+
 def test_execution_pause_blocks_dispatch_until_resumed(monkeypatch, tmp_path: Path) -> None:
     configure_execution_env(monkeypatch, tmp_path)
 

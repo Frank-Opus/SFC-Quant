@@ -141,6 +141,59 @@ def write_fake_vendored_tradingagents_repo(tmp_path: Path) -> Path:
     return repo_root
 
 
+def test_rdagent_bridge_sets_bounded_env_aliases(monkeypatch) -> None:
+    import importlib.util
+    import sys
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "run_rdagent.py"
+    spec = importlib.util.spec_from_file_location("test_run_rdagent_bridge", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    monkeypatch.setenv("AI_API_KEY", "test-key")
+    monkeypatch.setenv("AI_BASE_URL", "https://mirror.example.com/openai")
+    monkeypatch.setenv("AI_MODEL", "gpt-5.4")
+    monkeypatch.setenv("RDAGENT_DSFC_CHAT_STREAM", "true")
+    monkeypatch.setenv("RDAGENT_DSFC_MAX_RETRY", "2")
+    monkeypatch.setenv("RDAGENT_DSFC_TIMEOUT_FAIL_LIMIT", "2")
+    monkeypatch.setenv("RDAGENT_DSFC_RETRY_WAIT_SECONDS", "1")
+    for key in [
+        "OPENAI_API_KEY",
+        "OPENAI_API_BASE",
+        "OPENAI_BASE_URL",
+        "CHAT_MODEL",
+        "OPENAI_MODEL",
+        "EMBEDDING_MODEL",
+        "CHAT_STREAM",
+        "MAX_RETRY",
+        "TIMEOUT_FAIL_LIMIT",
+        "RETRY_WAIT_SECONDS",
+        "LITELLM_CHAT_STREAM",
+        "LITELLM_MAX_RETRY",
+        "LITELLM_TIMEOUT_FAIL_LIMIT",
+        "LITELLM_RETRY_WAIT_SECONDS",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
+    module._apply_provider_env_aliases()
+
+    assert module.os.environ["OPENAI_API_KEY"] == "test-key"
+    assert module.os.environ["OPENAI_API_BASE"] == "https://mirror.example.com/openai/v1"
+    assert module.os.environ["OPENAI_BASE_URL"] == "https://mirror.example.com/openai/v1"
+    assert module.os.environ["CHAT_MODEL"] == "gpt-5.4"
+    assert module.os.environ["OPENAI_MODEL"] == "gpt-5.4"
+    assert module.os.environ["CHAT_STREAM"] == "true"
+    assert module.os.environ["MAX_RETRY"] == "2"
+    assert module.os.environ["TIMEOUT_FAIL_LIMIT"] == "2"
+    assert module.os.environ["RETRY_WAIT_SECONDS"] == "1"
+    assert module.os.environ["LITELLM_CHAT_STREAM"] == "true"
+    assert module.os.environ["LITELLM_MAX_RETRY"] == "2"
+    assert module.os.environ["LITELLM_TIMEOUT_FAIL_LIMIT"] == "2"
+    assert module.os.environ["LITELLM_RETRY_WAIT_SECONDS"] == "1"
+
+
 def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -> None:
     workspace = configure_strategy_env(monkeypatch, tmp_path)
 

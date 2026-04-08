@@ -223,3 +223,37 @@ def test_backtest_route_replays_offline_history_and_returns_metrics(monkeypatch,
     assert payload["candle_count"] == len(snapshot.candles)
 
     get_settings.cache_clear()
+
+
+def test_backtest_route_falls_back_to_mock_snapshot_when_real_market_is_unavailable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_runtime_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("MARKET_DATA_MODE", "real")
+    get_settings.cache_clear()
+
+    snapshot = build_snapshot_from_closes([100.0, 102.0, 103.0, 99.0])
+
+    async def fail_ensure_snapshot(self, *, symbol: str, timeframe: str, force_refresh: bool = False):
+        raise RuntimeError("binance GET https://api.binance.com/api/v3/exchangeInfo")
+
+    async def fake_build_fallback_snapshot(self, *, symbol: str, timeframe: str):
+        assert symbol == "BTC/USDT"
+        assert timeframe == "1m"
+        return snapshot
+
+    monkeypatch.setattr(MarketRuntimeService, "ensure_snapshot", fail_ensure_snapshot)
+    monkeypatch.setattr(MarketRuntimeService, "build_fallback_snapshot", fake_build_fallback_snapshot)
+
+    with TestClient(app) as client:
+        response = client.post("/api/backtest/run", json={"symbol": "BTC/USDT", "timeframe": "1m"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mode"] == "backtest"
+    assert payload["symbol"] == "BTC/USDT"
+    assert payload["timeframe"] == "1m"
+    assert payload["source"] == "mock"
+    assert payload["candle_count"] == len(snapshot.candles)
+
+    get_settings.cache_clear()

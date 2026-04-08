@@ -89,6 +89,26 @@ def _apply_provider_env_aliases() -> None:
         os.environ.setdefault("OPENAI_MODEL", model)
         os.environ.setdefault("EMBEDDING_MODEL", "text-embedding-3-small")
 
+    # Some OpenAI-compatible mirrors return `content: null` for non-streaming chat
+    # completions while still emitting valid streamed deltas, so prefer streaming
+    # unless the operator overrides it explicitly.
+    chat_stream = os.environ.get("RDAGENT_DSFC_CHAT_STREAM", "true")
+    max_retry = os.environ.get("RDAGENT_DSFC_MAX_RETRY", "2")
+    timeout_fail_limit = os.environ.get("RDAGENT_DSFC_TIMEOUT_FAIL_LIMIT", "2")
+    retry_wait_seconds = os.environ.get("RDAGENT_DSFC_RETRY_WAIT_SECONDS", "1")
+
+    # RD-Agent reads generic LLM settings, while LiteLLM-specific helpers read the
+    # prefixed variants. Set both so retry/stream behavior stays bounded.
+    os.environ.setdefault("CHAT_STREAM", chat_stream)
+    os.environ.setdefault("MAX_RETRY", max_retry)
+    os.environ.setdefault("TIMEOUT_FAIL_LIMIT", timeout_fail_limit)
+    os.environ.setdefault("RETRY_WAIT_SECONDS", retry_wait_seconds)
+
+    os.environ.setdefault("LITELLM_CHAT_STREAM", chat_stream)
+    os.environ.setdefault("LITELLM_MAX_RETRY", max_retry)
+    os.environ.setdefault("LITELLM_TIMEOUT_FAIL_LIMIT", timeout_fail_limit)
+    os.environ.setdefault("LITELLM_RETRY_WAIT_SECONDS", retry_wait_seconds)
+
 
 def main() -> int:
     _maybe_reexec_provider_venv()

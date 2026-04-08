@@ -93,10 +93,31 @@ class AnalysisService:
         *,
         trigger: AnalysisTrigger = "manual",
     ) -> AnalysisRunResult:
-        market_snapshot = await self._market_service.ensure_snapshot(
-            symbol=request.symbol,
-            timeframe=request.timeframe,
-        )
+        market_snapshot_fallback = False
+        try:
+            market_snapshot = await self._market_service.ensure_snapshot(
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+            )
+        except RuntimeError as exc:
+            market_snapshot = await self._market_service.build_fallback_snapshot(
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+            )
+            market_snapshot_fallback = True
+            await self._event_bus.publish(
+                event_type="system.warning",
+                source="analysis.market",
+                payload={
+                    "message": (
+                        "Real market snapshot unavailable; using explicit mock snapshot for "
+                        "fallback analysis."
+                    ),
+                    "detail": str(exc),
+                    "symbol": request.symbol,
+                    "timeframe": request.timeframe,
+                },
+            )
         external_intelligence = await self._intelligence_service.snapshot(
             symbol=request.symbol,
             timeframe=request.timeframe,
@@ -141,7 +162,7 @@ class AnalysisService:
             )
 
         outputs: list[AgentAnalysisResult] = []
-        used_fallback = bool(selection.fallback_reason)
+        used_fallback = market_snapshot_fallback or bool(selection.fallback_reason)
         for role in ROLE_SEQUENCE:
             output = await self._run_role(
                 role=role,
@@ -151,6 +172,7 @@ class AnalysisService:
                 prior_outputs=outputs,
                 configured_provider=selection.provider,
                 external_intelligence=external_intelligence,
+                force_fallback=market_snapshot_fallback,
             )
             outputs.append(output)
             used_fallback = used_fallback or output.status == "fallback"
@@ -208,6 +230,7 @@ class AnalysisService:
         prior_outputs: list[AgentAnalysisResult],
         configured_provider,
         external_intelligence: IntelligenceSnapshotResponse,
+        force_fallback: bool = False,
     ) -> AgentAnalysisResult:
         system_prompt = self._build_system_prompt(role)
         user_prompt = self._build_user_prompt(
@@ -255,6 +278,8 @@ class AnalysisService:
             )
 
         latency_ms = int((time.perf_counter() - started) * 1000)
+        if force_fallback:
+            status = "fallback"
         result = AgentAnalysisResult(
             role=role,
             status=status,
