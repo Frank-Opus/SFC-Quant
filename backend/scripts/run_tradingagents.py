@@ -59,11 +59,9 @@ def _looks_like_stock_symbol(symbol: str) -> bool:
 def _normalize_openai_base_url(base_url: str) -> str:
     parsed = urlparse(base_url)
     path = parsed.path.rstrip("/")
-    if path.endswith("/v1"):
+    if path.endswith("/v1") or path.endswith("/responses") or path.endswith("/chat/completions"):
         return base_url.rstrip("/")
-    if not path:
-        return f"{base_url.rstrip('/')}/v1"
-    return base_url.rstrip("/")
+    return f"{base_url.rstrip('/')}/v1"
 
 
 def _resolve_llm_provider() -> tuple[str, str]:

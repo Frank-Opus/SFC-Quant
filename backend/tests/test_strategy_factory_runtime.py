@@ -174,10 +174,21 @@ def test_rdagent_bridge_sets_bounded_env_aliases(monkeypatch) -> None:
         "LITELLM_MAX_RETRY",
         "LITELLM_TIMEOUT_FAIL_LIMIT",
         "LITELLM_RETRY_WAIT_SECONDS",
+        "QLIB_QUANT_EVOLVING_N",
+        "QLIB_FACTOR_EVOLVING_N",
+        "QLIB_MODEL_EVOLVING_N",
+        "FACTOR_CoSTEER_MAX_LOOP",
+        "MODEL_CoSTEER_MAX_LOOP",
+        "RDAGENT_DSFC_MAX_FACTOR_TASKS",
     ]:
         monkeypatch.delenv(key, raising=False)
 
     module._apply_provider_env_aliases()
+    monkeypatch.setenv("DSFC_STRATEGY_INPUT_JSON", "/tmp/input.json")
+    monkeypatch.setenv("DSFC_STRATEGY_ARTIFACT_DIR", "/tmp/artifacts")
+    monkeypatch.setenv("STRATEGY_FACTORY_WORKSPACE", "/tmp/workspace")
+    monkeypatch.setattr(module.sys, "argv", ["run_rdagent.py", "fin_quant"])
+    module._apply_bridge_defaults()
 
     assert module.os.environ["OPENAI_API_KEY"] == "test-key"
     assert module.os.environ["OPENAI_API_BASE"] == "https://mirror.example.com/openai/v1"
@@ -192,6 +203,12 @@ def test_rdagent_bridge_sets_bounded_env_aliases(monkeypatch) -> None:
     assert module.os.environ["LITELLM_MAX_RETRY"] == "2"
     assert module.os.environ["LITELLM_TIMEOUT_FAIL_LIMIT"] == "2"
     assert module.os.environ["LITELLM_RETRY_WAIT_SECONDS"] == "1"
+    assert module.os.environ["QLIB_QUANT_EVOLVING_N"] == "1"
+    assert module.os.environ["QLIB_FACTOR_EVOLVING_N"] == "1"
+    assert module.os.environ["QLIB_MODEL_EVOLVING_N"] == "1"
+    assert module.os.environ["FACTOR_CoSTEER_MAX_LOOP"] == "1"
+    assert module.os.environ["MODEL_CoSTEER_MAX_LOOP"] == "1"
+    assert module.os.environ["RDAGENT_DSFC_MAX_FACTOR_TASKS"] == "1"
 
 
 def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -> None:

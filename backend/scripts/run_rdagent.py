@@ -61,15 +61,37 @@ def _apply_bridge_defaults() -> None:
         ]
     )
 
+    # Product-internal strategy generation needs a bounded, reviewable output
+    # rather than RD-Agent's default multi-factor, multi-evolution search.
+    bounded_env_defaults = {
+        "QLIB_QUANT_EVOLVING_N": os.environ.get("RDAGENT_DSFC_QUANT_EVOLVING_N", "1"),
+        "QLIB_FACTOR_EVOLVING_N": os.environ.get("RDAGENT_DSFC_FACTOR_EVOLVING_N", "1"),
+        "QLIB_MODEL_EVOLVING_N": os.environ.get("RDAGENT_DSFC_MODEL_EVOLVING_N", "1"),
+        "FACTOR_CoSTEER_MAX_LOOP": os.environ.get("RDAGENT_DSFC_FACTOR_MAX_LOOP", "1"),
+        "MODEL_CoSTEER_MAX_LOOP": os.environ.get("RDAGENT_DSFC_MODEL_MAX_LOOP", "1"),
+        "RDAGENT_DSFC_MAX_FACTOR_TASKS": os.environ.get("RDAGENT_DSFC_MAX_FACTOR_TASKS", "1"),
+    }
+    for key, value in bounded_env_defaults.items():
+        os.environ.setdefault(key, value)
+
+    if not os.environ.get("WORKSPACE_PATH"):
+        strategy_workspace = os.environ.get("STRATEGY_FACTORY_WORKSPACE", "").strip()
+        if strategy_workspace:
+            try:
+                project_root = Path(strategy_workspace).expanduser().resolve().parents[2]
+                workspace_path = project_root / "backend" / "git_ignore_folder" / "RD-Agent_workspace"
+                workspace_path.mkdir(parents=True, exist_ok=True)
+                os.environ["WORKSPACE_PATH"] = str(workspace_path)
+            except Exception:
+                pass
+
 
 def _normalize_openai_base_url(base_url: str) -> str:
     parsed = urlparse(base_url)
     path = parsed.path.rstrip("/")
-    if path.endswith("/v1"):
+    if path.endswith("/v1") or path.endswith("/responses") or path.endswith("/chat/completions"):
         return base_url.rstrip("/")
-    if not path:
-        return f"{base_url.rstrip('/')}/v1"
-    return base_url.rstrip("/")
+    return f"{base_url.rstrip('/')}/v1"
 
 
 def _apply_provider_env_aliases() -> None:
