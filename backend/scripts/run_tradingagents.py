@@ -6,6 +6,8 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
+from typing import Any
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROVIDER_VENV = Path(
@@ -54,9 +56,28 @@ def _looks_like_stock_symbol(symbol: str) -> bool:
     return False
 
 
+def _normalize_openai_base_url(base_url: str) -> str:
+    parsed = urlparse(base_url)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/v1"):
+        return base_url.rstrip("/")
+    if not path:
+        return f"{base_url.rstrip('/')}/v1"
+    return base_url.rstrip("/")
+
+
 def _resolve_llm_provider() -> tuple[str, str]:
     if os.environ.get("DASHSCOPE_API_KEY"):
         return "dashscope", "qwen-plus"
+    if os.environ.get("AI_BASE_URL"):
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("AI_API_KEY") or ""
+        normalized_base_url = _normalize_openai_base_url(os.environ["AI_BASE_URL"])
+        os.environ.setdefault("OPENAI_API_KEY", api_key)
+        os.environ.setdefault("CUSTOM_OPENAI_API_KEY", api_key)
+        os.environ.setdefault("CUSTOM_OPENAI_BASE_URL", normalized_base_url)
+        os.environ.setdefault("TRADINGAGENTS_DSFC_MAX_DEBATE_ROUNDS", "0")
+        os.environ.setdefault("TRADINGAGENTS_DSFC_MAX_RISK_DISCUSS_ROUNDS", "0")
+        return "custom_openai", os.environ.get("AI_MODEL", "gpt-4o-mini")
     if os.environ.get("OPENAI_API_KEY") or os.environ.get("AI_API_KEY"):
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("AI_API_KEY") or ""
         os.environ.setdefault("OPENAI_API_KEY", api_key)
@@ -64,6 +85,29 @@ def _resolve_llm_provider() -> tuple[str, str]:
     raise RuntimeError(
         "TradingAgents-CN bridge requires DASHSCOPE_API_KEY or OPENAI_API_KEY/AI_API_KEY."
     )
+
+
+def _json_default(value: Any) -> Any:
+    try:
+        from langchain_core.messages import BaseMessage
+        from langchain_core.messages.base import message_to_dict
+    except Exception:  # pragma: no cover - vendor/runtime fallback
+        BaseMessage = None
+        message_to_dict = None
+
+    if BaseMessage is not None and isinstance(value, BaseMessage) and message_to_dict is not None:
+        return message_to_dict(value)
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, set):
+        return sorted(value)
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if hasattr(value, "dict"):
+        return value.dict()
+    if hasattr(value, "__dict__"):
+        return value.__dict__
+    return str(value)
 
 
 def _write_bridge_validation_artifact(artifact_dir: Path, payload: dict, reason: str) -> int:
@@ -120,7 +164,7 @@ def _run_bridge_mode() -> int:
 
     report_path = artifact_dir / "tradingagents-report.json"
     report_path.write_text(
-        json.dumps(results, ensure_ascii=False, indent=2),
+        json.dumps(results, ensure_ascii=False, indent=2, default=_json_default),
         encoding="utf-8",
     )
     markdown_path = artifact_dir / "tradingagents-report.md"
