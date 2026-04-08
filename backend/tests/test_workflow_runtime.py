@@ -24,7 +24,39 @@ def configure_workflow_env(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("STRATEGY_FACTORY_ENABLED", "true")
     monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "mock_rdq")
     monkeypatch.setenv("STRATEGY_FACTORY_WORKSPACE", str(tmp_path / "strategy_factory"))
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(tmp_path / "missing-rdagent"))
+    monkeypatch.setenv(
+        "STRATEGY_FACTORY_TRADINGAGENTS_COMMAND",
+        str(tmp_path / "missing-tradingagents"),
+    )
     get_settings.cache_clear()
+
+
+def write_fake_tradingagents(tmp_path: Path) -> Path:
+    script_path = tmp_path / "fake_tradingagents.py"
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import json",
+                "import os",
+                "from pathlib import Path",
+                "",
+                "artifact_dir = Path(os.environ['DSFC_STRATEGY_ARTIFACT_DIR'])",
+                "input_path = Path(os.environ['DSFC_STRATEGY_INPUT_JSON'])",
+                "payload = json.loads(input_path.read_text())",
+                "generated_path = artifact_dir / 'tradingagents-generated.md'",
+                "generated_path.write_text(",
+                "    f\"# TradingAgents Output\\n\\n{payload['symbol']} {payload['timeframe']}\\n\"",
+                ")",
+                "print(f\"generated {generated_path.name}\")",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    script_path.chmod(0o755)
+    return script_path
 
 
 def make_analysis_result(run_id: str, recommendation: str = "buy") -> AnalysisRunResult:
@@ -240,5 +272,52 @@ def test_workflow_current_handoff_uses_run_ledger_detail(
     assert payload["current_handoff"] == ledger_record.detail
     assert payload["roles"][0]["run_id"] == run_id
     assert payload["active_stage_key"] in {"execution", "performance", "strategy"}
+
+    get_settings.cache_clear()
+
+
+def test_workflow_snapshot_tracks_provider_artifacts_per_provider(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_workflow_env(monkeypatch, tmp_path)
+    fake_tradingagents = write_fake_tradingagents(tmp_path)
+    monkeypatch.setenv("STRATEGY_FACTORY_TRADINGAGENTS_COMMAND", str(fake_tradingagents))
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+        mock_strategy_response = client.post(
+            "/api/strategy/generate",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "mock"},
+        )
+        config_response = client.post(
+            "/api/strategy/config",
+            json={"provider": "tradingagents_cn"},
+        )
+        tradingagents_strategy_response = client.post(
+            "/api/strategy/generate",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "tradingagents"},
+        )
+        workflow_response = client.get(
+            "/api/workflow/snapshot",
+            params={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert analysis_response.status_code == 200
+    assert mock_strategy_response.status_code == 200
+    assert config_response.status_code == 200
+    assert tradingagents_strategy_response.status_code == 200
+    assert workflow_response.status_code == 200
+
+    providers = {
+        item["provider"]: item
+        for item in workflow_response.json()["providers"]
+    }
+    assert providers["mock_rdq"]["artifact_count"] == 3
+    assert providers["tradingagents_cn"]["artifact_count"] >= 7
 
     get_settings.cache_clear()

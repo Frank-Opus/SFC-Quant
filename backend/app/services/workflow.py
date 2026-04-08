@@ -70,11 +70,15 @@ class WorkflowService:
             timeframe=focus_timeframe,
         )
         strategy_status = self._strategy_factory_service.status()
+        latest_strategy_artifacts = self._strategy_factory_service.list_artifacts(limit=32)
         execution_status = self._execution_service.status()
         risk_status = self._risk_service.status()
         paper_report = self._performance_service.paper_report()
         role_states = self._build_role_states(latest_analysis=latest_analysis)
-        provider_states = self._build_provider_states(strategy_status=strategy_status)
+        provider_states = self._build_provider_states(
+            strategy_status=strategy_status,
+            latest_strategy_artifacts=latest_strategy_artifacts,
+        )
         notices = self._build_notices(
             market_snapshot_response=market_snapshot_response,
             strategy_status=strategy_status,
@@ -416,11 +420,19 @@ class WorkflowService:
             for output in latest_analysis.outputs
         ]
 
-    def _build_provider_states(self, *, strategy_status) -> list[WorkflowProviderState]:
+    def _build_provider_states(
+        self,
+        *,
+        strategy_status,
+        latest_strategy_artifacts,
+    ) -> list[WorkflowProviderState]:
         generation = strategy_status.generation
-        latest_artifact = strategy_status.latest_artifact
+        latest_by_provider = {}
+        for artifact in latest_strategy_artifacts:
+            latest_by_provider.setdefault(artifact.effective_provider, artifact)
         items: list[WorkflowProviderState] = []
         for provider in strategy_status.providers:
+            latest_artifact = latest_by_provider.get(provider.provider)
             phase = generation.phase if generation.active_provider == provider.provider else "idle"
             if generation.active_provider == provider.provider:
                 status = self._map_generation_status(generation.status)

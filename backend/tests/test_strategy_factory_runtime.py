@@ -23,6 +23,11 @@ def configure_strategy_env(monkeypatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("STRATEGY_FACTORY_ENABLED", "true")
     monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "mock_rdq")
     monkeypatch.setenv("STRATEGY_FACTORY_WORKSPACE", str(workspace))
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(tmp_path / "missing-rdagent"))
+    monkeypatch.setenv(
+        "STRATEGY_FACTORY_TRADINGAGENTS_COMMAND",
+        str(tmp_path / "missing-tradingagents"),
+    )
     get_settings.cache_clear()
     return workspace
 
@@ -234,6 +239,42 @@ def test_strategy_factory_status_and_config_route(monkeypatch, tmp_path: Path) -
     assert enable_response.json()["enabled"] is True
     assert enable_response.json()["configured_provider"] == "rd_agent_q"
     assert enable_response.json()["effective_provider"] == "mock_rdq"
+
+    get_settings.cache_clear()
+
+
+def test_strategy_status_clears_stale_generation_after_provider_switch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        service = client.app.state.strategy_factory_service
+        service._set_generation_state(  # noqa: SLF001 - explicit runtime regression setup
+            status="failed",
+            phase="failed",
+            symbol="BTC/USDT",
+            timeframe="1m",
+            run_id="stale-run",
+            active_provider="rd_agent_q",
+            provider_label="RD-Agent(Q)",
+            detail="stale failure",
+        )
+
+        response = client.post(
+            "/api/strategy/config",
+            json={"provider": "mock_rdq"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configured_provider"] == "mock_rdq"
+    assert payload["effective_provider"] == "mock_rdq"
+    assert payload["generation"]["status"] == "idle"
+    assert payload["generation"]["phase"] == "idle"
+    assert payload["generation"]["active_provider"] is None
+    assert payload["generation"]["detail"] is None
 
     get_settings.cache_clear()
 

@@ -92,6 +92,7 @@ class StrategyFactoryService:
         artifacts = self.list_artifacts(limit=1)
         with self._generation_lock:
             generation = self._generation_state.model_copy(deep=True)
+        generation = self._visible_generation_state(generation)
         return StrategyFactoryStatusResponse(
             enabled=self._enabled,
             configured_provider=self._configured_provider,
@@ -104,6 +105,23 @@ class StrategyFactoryService:
             generation=generation,
             providers=self._provider_runtimes(),
         )
+
+    def _visible_generation_state(
+        self,
+        generation: StrategyGenerationState,
+    ) -> StrategyGenerationState:
+        if generation.status == "running":
+            return generation
+        if not self._enabled:
+            return StrategyGenerationState()
+
+        effective_provider = self._effective_provider()
+        if (
+            generation.active_provider is not None
+            and generation.active_provider != effective_provider
+        ):
+            return StrategyGenerationState()
+        return generation
 
     def agent_runtime(self) -> AgentRuntimeSummaryResponse:
         status = self.status()
