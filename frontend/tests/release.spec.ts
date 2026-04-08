@@ -88,7 +88,7 @@ test("SFC-Quant release walkthrough stays truthful and operable", async ({ page,
 
   await page.getByRole("button", { name: "宏观证据与策略工作区" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "宏观证据与策略工作区" })).toBeVisible();
-  await expect(page.getByTestId("section-truth-strip")).toBeVisible();
+  await expect(page.getByTestId("section-truth-strip").first()).toBeVisible();
 
   const enableFactoryResponse = page.waitForResponse(
     (response) =>

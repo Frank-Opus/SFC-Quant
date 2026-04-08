@@ -12,15 +12,23 @@ ARG NO_PROXY=""
 
 WORKDIR /app
 
-ENV DSFC_PROVIDER_VENV_ROOT=/opt/provider-venvs
+ENV DSFC_PROVIDER_VENV_ROOT=/opt/provider-venvs \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    ALL_PROXY=${ALL_PROXY} \
+    NO_PROXY=${NO_PROXY} \
+    http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    all_proxy=${ALL_PROXY} \
+    no_proxy=${NO_PROXY} \
+    PIP_DEFAULT_TIMEOUT=120
 
 COPY pyproject.toml README.md ./
 COPY app ./app
 COPY scripts ./scripts
 COPY vendor ./vendor
 
-RUN python -m pip install --no-cache-dir --upgrade pip \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/* \
     && if [ -n "$BACKEND_EXTRAS" ]; then python -m pip install --no-cache-dir ".[${BACKEND_EXTRAS}]"; else python -m pip install --no-cache-dir .; fi \
@@ -28,14 +36,12 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/rdagent ]; then \
          python -m pip install --no-cache-dir -e ./vendor/strategy_providers/rdagent \
          && python -m venv --system-site-packages "${DSFC_PROVIDER_VENV_ROOT}/rdagent" \
-         && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir --upgrade pip \
          && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir "openai==2.30.0" \
          && "${DSFC_PROVIDER_VENV_ROOT}/rdagent/bin/pip" install --no-cache-dir --no-deps -e ./vendor/strategy_providers/rdagent; \
        fi \
     && if [ "$INSTALL_STRATEGY_PROVIDERS" = "1" ] && [ -d ./vendor/strategy_providers/tradingagents_cn ]; then \
          python -m pip install --no-cache-dir -e ./vendor/strategy_providers/tradingagents_cn \
          && python -m venv --system-site-packages "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn" \
-         && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir --upgrade pip \
          && "${DSFC_PROVIDER_VENV_ROOT}/tradingagents_cn/bin/pip" install --no-cache-dir --no-deps -e ./vendor/strategy_providers/tradingagents_cn; \
        fi
 
