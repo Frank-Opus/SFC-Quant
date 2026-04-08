@@ -1,6 +1,6 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
 import { Activity, Fuel, Globe2, Landmark, Newspaper } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useLocale } from "../../lib/i18n";
 import {
@@ -51,9 +51,14 @@ type MacroIntelligencePanelProps = {
   timeframe: string;
 };
 
+type MetricFilter = "all" | "crypto" | "macro" | "energy";
+type HeadlineFilter = "all" | "latest" | "warnings";
+
 export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligencePanelProps) {
   const { t, formatDateTime, formatNumber, formatPercent } = useLocale();
   const [snapshot, setSnapshot] = useState<IntelligenceSnapshotResponse>(fallbackIntelligenceSnapshot);
+  const [metricFilter, setMetricFilter] = useState<MetricFilter>("all");
+  const [headlineFilter, setHeadlineFilter] = useState<HeadlineFilter>("all");
 
   useEffect(() => {
     let active = true;
@@ -75,6 +80,54 @@ export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligenceP
     };
   }, [symbol, timeframe]);
 
+  const macroHealth = useMemo(
+    () => [
+      {
+        id: "providers",
+        label: t("macroIntel.health.liveProviders"),
+        value: `${snapshot.providers.filter((provider) => provider.available).length}/${snapshot.providers.length}`,
+      },
+      {
+        id: "metrics",
+        label: t("macroIntel.health.metrics"),
+        value: String(snapshot.crypto.length + snapshot.macro.length + snapshot.energy.length),
+      },
+      {
+        id: "headlines",
+        label: t("macroIntel.health.headlines"),
+        value: String(snapshot.headlines.length),
+      },
+      {
+        id: "warnings",
+        label: t("macroIntel.health.warnings"),
+        value: String(snapshot.warnings.length),
+      },
+    ],
+    [snapshot, t],
+  );
+
+  const filteredMetricSections = useMemo(() => {
+    const sections = [
+      { key: "crypto" as const, title: t("macroIntel.crypto"), icon: Globe2, items: snapshot.crypto },
+      { key: "macro" as const, title: t("macroIntel.macro"), icon: Landmark, items: snapshot.macro },
+      { key: "energy" as const, title: t("macroIntel.energy"), icon: Fuel, items: snapshot.energy },
+    ];
+
+    return metricFilter === "all" ? sections : sections.filter((section) => section.key === metricFilter);
+  }, [metricFilter, snapshot.crypto, snapshot.energy, snapshot.macro, t]);
+
+  const filteredHeadlines = useMemo(() => {
+    if (headlineFilter === "latest") {
+      return snapshot.headlines.slice(0, 3);
+    }
+    if (headlineFilter === "warnings") {
+      return snapshot.headlines.filter((headline) =>
+        /fed|war|tariff|risk|liquid|hack|sanction|volatility/i.test(headline.title),
+      );
+    }
+    return snapshot.headlines;
+  }, [headlineFilter, snapshot.headlines]);
+
   return (
     <div className="extension-card macro-intel-card">
       <div className="extension-card-headline">
@@ -89,6 +142,15 @@ export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligenceP
         {snapshot.summary}
       </p>
 
+      <div className="macro-health-strip">
+        {macroHealth.map((item) => (
+          <article className="macro-health-card" key={item.id}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </article>
+        ))}
+      </div>
+
       <div className="macro-regime-row">
         <div>
           <span className="section-label">{t("macroIntel.focus")}</span>
@@ -97,6 +159,41 @@ export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligenceP
         <div>
           <span className="section-label">{t("macroIntel.updatedAt")}</span>
           <strong>{formatDateTime(snapshot.generated_at)}</strong>
+        </div>
+      </div>
+
+      <div className="macro-controlbar">
+        <div className="macro-control-group">
+          <span className="section-label">{t("macroIntel.filterMetrics")}</span>
+          <div className="macro-chip-row">
+            {(["all", "crypto", "macro", "energy"] as MetricFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="macro-chip"
+                data-active={metricFilter === filter}
+                key={filter}
+                onClick={() => setMetricFilter(filter)}
+              >
+                {t(`macroIntel.metricFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="macro-control-group">
+          <span className="section-label">{t("macroIntel.filterHeadlines")}</span>
+          <div className="macro-chip-row">
+            {(["all", "latest", "warnings"] as HeadlineFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="macro-chip"
+                data-active={headlineFilter === filter}
+                key={filter}
+                onClick={() => setHeadlineFilter(filter)}
+              >
+                {t(`macroIntel.headlineFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -117,94 +214,46 @@ export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligenceP
       </section>
 
       <div className="evidence-grid">
-        <section className="source-block">
-          <div className="evidence-block-head">
-            <Globe2 size={16} />
-            <strong>{t("macroIntel.crypto")}</strong>
-          </div>
-          <div className="source-list">
-            {snapshot.crypto.length > 0 ? (
-              snapshot.crypto.map((metric) => (
-                <article className="source-row" key={metric.key}>
-                  <div>
-                    <span className="section-label">{metric.source}</span>
-                    <strong>{metric.label}</strong>
-                    <p>{metric.as_of ? formatDateTime(metric.as_of) : "-"}</p>
-                  </div>
-                  <div className="macro-intel-metric">
-                    <strong>{formatNumber(metric.value, 2)} {metric.unit ?? ""}</strong>
-                    {metric.change_percent != null ? (
-                      <Badge color={metricTone(metric)}>{formatPercent(metric.change_percent, true)}</Badge>
-                    ) : null}
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">{t("macroIntel.empty")}</div>
-            )}
-          </div>
-        </section>
-
-        <section className="source-block">
-          <div className="evidence-block-head">
-            <Landmark size={16} />
-            <strong>{t("macroIntel.macro")}</strong>
-          </div>
-          <div className="source-list">
-            {snapshot.macro.length > 0 ? (
-              snapshot.macro.map((metric) => (
-                <article className="source-row" key={metric.key}>
-                  <div>
-                    <span className="section-label">{metric.source}</span>
-                    <strong>{metric.label}</strong>
-                    <p>{metric.as_of ? formatDateTime(metric.as_of) : "-"}</p>
-                  </div>
-                  <div className="macro-intel-metric">
-                    <strong>{formatNumber(metric.value, 2)} {metric.unit ?? ""}</strong>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">{t("macroIntel.empty")}</div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      <div className="evidence-grid">
-        <section className="source-block">
-          <div className="evidence-block-head">
-            <Fuel size={16} />
-            <strong>{t("macroIntel.energy")}</strong>
-          </div>
-          <div className="source-list">
-            {snapshot.energy.length > 0 ? (
-              snapshot.energy.map((metric) => (
-                <article className="source-row" key={metric.key}>
-                  <div>
-                    <span className="section-label">{metric.source}</span>
-                    <strong>{metric.label}</strong>
-                    <p>{metric.as_of ? formatDateTime(metric.as_of) : "-"}</p>
-                  </div>
-                  <div className="macro-intel-metric">
-                    <strong>{formatNumber(metric.value, 2)} {metric.unit ?? ""}</strong>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">{t("macroIntel.empty")}</div>
-            )}
-          </div>
-        </section>
-
+        {filteredMetricSections.map((section) => {
+          const Icon = section.icon;
+          return (
+            <section className="source-block" key={section.key}>
+              <div className="evidence-block-head">
+                <Icon size={16} />
+                <strong>{section.title}</strong>
+              </div>
+              <div className="source-list">
+                {section.items.length > 0 ? (
+                  section.items.map((metric) => (
+                    <article className="source-row" key={metric.key}>
+                      <div>
+                        <span className="section-label">{metric.source}</span>
+                        <strong>{metric.label}</strong>
+                        <p>{metric.as_of ? formatDateTime(metric.as_of) : "-"}</p>
+                      </div>
+                      <div className="macro-intel-metric">
+                        <strong>{formatNumber(metric.value, 2)} {metric.unit ?? ""}</strong>
+                        {metric.change_percent != null ? (
+                          <Badge color={metricTone(metric)}>{formatPercent(metric.change_percent, true)}</Badge>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="empty-state">{t("macroIntel.empty")}</div>
+                )}
+              </div>
+            </section>
+          );
+        })}
         <section className="source-block">
           <div className="evidence-block-head">
             <Newspaper size={16} />
             <strong>{t("macroIntel.headlines")}</strong>
           </div>
           <div className="source-list">
-            {snapshot.headlines.length > 0 ? (
-              snapshot.headlines.map((headline) => (
+            {filteredHeadlines.length > 0 ? (
+              filteredHeadlines.map((headline) => (
                 <article className="source-row" key={`${headline.source}-${headline.url}`}>
                   <div>
                     <span className="section-label">{headline.source}</span>
@@ -218,7 +267,7 @@ export function MacroIntelligencePanel({ symbol, timeframe }: MacroIntelligenceP
                 </article>
               ))
             ) : (
-              <div className="empty-state">{t("macroIntel.empty")}</div>
+              <div className="empty-state">{t("macroIntel.noFilteredHeadlines")}</div>
             )}
           </div>
         </section>

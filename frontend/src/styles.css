@@ -879,6 +879,70 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
 }
 
+.agent-runtime-health-strip,
+.agent-runtime-controlbar,
+.agent-runtime-control-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.agent-runtime-health-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.agent-runtime-health-card,
+.agent-runtime-controlbar {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.agent-runtime-health-card {
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.agent-runtime-health-card span,
+.agent-runtime-control-group span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.agent-runtime-controlbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.9rem 1rem;
+}
+
+.agent-runtime-chip-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.agent-runtime-chip {
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.agent-runtime-chip:hover,
+.agent-runtime-chip[data-active="true"] {
+  color: var(--text-main);
+  border-color: rgba(121, 243, 255, 0.28);
+  background: linear-gradient(180deg, rgba(121, 243, 255, 0.12), rgba(255, 255, 255, 0.04));
+  transform: translateY(-1px);
+}
+
 .agent-runtime-grid--compact,
 .performance-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
@@ -995,6 +1059,70 @@ button {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+
+.macro-health-strip,
+.macro-controlbar,
+.macro-control-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.macro-health-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.macro-health-card,
+.macro-controlbar {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.macro-health-card {
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.macro-health-card span,
+.macro-control-group span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.macro-controlbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.9rem 1rem;
+}
+
+.macro-chip-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.macro-chip {
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.macro-chip:hover,
+.macro-chip[data-active="true"] {
+  color: var(--text-main);
+  border-color: rgba(121, 243, 255, 0.28);
+  background: linear-gradient(180deg, rgba(121, 243, 255, 0.12), rgba(255, 255, 255, 0.04));
+  transform: translateY(-1px);
 }
 
 .macro-intel-provider-chip {
@@ -3123,9 +3251,13 @@ button {
 
   .agent-runtime-stats,
   .performance-metric-grid,
+  .agent-runtime-health-strip,
+  .agent-runtime-controlbar,
   .strategy-health-strip,
   .strategy-controlbar,
-  .strategy-phase-strip {
+  .strategy-phase-strip,
+  .macro-health-strip,
+  .macro-controlbar {
     grid-template-columns: 1fr;
   }
 }
