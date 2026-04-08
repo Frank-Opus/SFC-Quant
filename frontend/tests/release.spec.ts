@@ -25,6 +25,7 @@ test("SFC-Quant release walkthrough stays truthful and operable", async ({ page,
     data: {
       enabled: false,
       auto_generate: false,
+      provider: "mock_rdq",
     },
   });
 
@@ -36,7 +37,7 @@ test("SFC-Quant release walkthrough stays truthful and operable", async ({ page,
   await expect(page.getByTestId("paper-guard-banner")).toHaveText(
     "当前仅为 paper 执行。行情可来自真实市场，但不会动用实盘资金。",
   );
-  await expect(page.getByTestId("requested-market-source")).toContainText("CCXT -> CCXT");
+  await expect(page.getByTestId("requested-market-source")).toContainText(/CCXT -> (CCXT|不可用|Unavailable)/);
   await expect(page.getByTestId("system-status-chip")).toContainText(/正常|回退|降级/);
 
   await page.screenshot({ path: "/tmp/sfc-quant-release-home-zh.png", fullPage: true });

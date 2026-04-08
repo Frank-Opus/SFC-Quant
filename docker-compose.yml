@@ -34,6 +34,7 @@ services:
       STRATEGY_FACTORY_TRADINGAGENTS_COMMAND: ${STRATEGY_FACTORY_TRADINGAGENTS_COMMAND:-/opt/provider-venvs/tradingagents_cn/bin/python /app/scripts/run_tradingagents.py}
       STRATEGY_FACTORY_TRADINGAGENTS_TIMEOUT_SECONDS: ${STRATEGY_FACTORY_TRADINGAGENTS_TIMEOUT_SECONDS:-900}
       DSFC_STRATEGY_PROVIDER_VENDOR_ROOT: ${DSFC_STRATEGY_PROVIDER_VENDOR_ROOT:-/app/vendor/strategy_providers}
+      DSFC_RDAGENT_QLIB_DIR: ${DSFC_RDAGENT_QLIB_DIR:-/tmp/dsfc-rdagent-qlib}
       RDAGENT_REPO: ${RDAGENT_REPO:-}
       TRADINGAGENTS_REPO: ${TRADINGAGENTS_REPO:-}
       EXCHANGE_ID: ${EXCHANGE_ID:-binance}
@@ -77,6 +78,15 @@ services:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Mirror the host project into the same absolute path so provider-launched
+      # sibling containers can bind-mount repo/workspace paths correctly.
+      - ${PROJECT_ROOT}:${PROJECT_ROOT}
+      # Mirror the host qlib cache into the same absolute path so RD-Agent sibling
+      # containers and the backend container see the same dataset path.
+      - ${DSFC_RDAGENT_QLIB_DIR:-/tmp/dsfc-rdagent-qlib}:${DSFC_RDAGENT_QLIB_DIR:-/tmp/dsfc-rdagent-qlib}
+      # Hot-reload backend source without forcing full provider image rebuilds.
+      - ${PROJECT_ROOT}/backend/app:/app/app
+      - ${PROJECT_ROOT}/backend/scripts:/app/scripts
     healthcheck:
       test:
         [

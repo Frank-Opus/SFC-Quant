@@ -1,5 +1,6 @@
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Iterable
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from app.models.analysis import (
     ProviderAnalysisDraft,
     SourceReference,
 )
+from app.models.events import EventEnvelope
 from app.models.intelligence import IntelligenceSnapshotResponse
 from app.models.market import MarketSnapshot
 from app.services.event_bus import EventBus
@@ -59,7 +61,24 @@ class AnalysisService:
         return self._intelligence_service
 
     async def initialize(self) -> None:
-        for event in reversed(self._event_bus.get_recent_events(limit=200)):
+        self._latest_runs = {}
+
+        event_log_path = Path(self._event_bus.event_log_path)
+        if event_log_path.exists():
+            for line in event_log_path.read_text(encoding="utf-8").splitlines():
+                if '"event_type": "agent.analysis.completed"' not in line:
+                    continue
+                try:
+                    event = EventEnvelope.model_validate_json(line)
+                    run = AnalysisRunResult.model_validate(event.payload)
+                except Exception:
+                    continue
+                self._latest_runs[self._key(run.symbol, run.timeframe)] = run
+
+        if self._latest_runs:
+            return
+
+        for event in reversed(self._event_bus.get_recent_events(limit=5000)):
             if event.event_type != "agent.analysis.completed":
                 continue
             try:

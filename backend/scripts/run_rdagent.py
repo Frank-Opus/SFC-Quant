@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROVIDER_VENV = Path(
@@ -61,8 +62,37 @@ def _apply_bridge_defaults() -> None:
     )
 
 
+def _normalize_openai_base_url(base_url: str) -> str:
+    parsed = urlparse(base_url)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/v1"):
+        return base_url.rstrip("/")
+    if not path:
+        return f"{base_url.rstrip('/')}/v1"
+    return base_url.rstrip("/")
+
+
+def _apply_provider_env_aliases() -> None:
+    api_key = os.environ.get("AI_API_KEY", "").strip()
+    if api_key and not os.environ.get("OPENAI_API_KEY"):
+        os.environ["OPENAI_API_KEY"] = api_key
+
+    base_url = os.environ.get("AI_BASE_URL", "").strip()
+    if base_url:
+        normalized = _normalize_openai_base_url(base_url)
+        os.environ.setdefault("OPENAI_API_BASE", normalized)
+        os.environ.setdefault("OPENAI_BASE_URL", normalized)
+
+    model = os.environ.get("AI_MODEL", "").strip()
+    if model:
+        os.environ.setdefault("CHAT_MODEL", model)
+        os.environ.setdefault("OPENAI_MODEL", model)
+        os.environ.setdefault("EMBEDDING_MODEL", "text-embedding-3-small")
+
+
 def main() -> int:
     _maybe_reexec_provider_venv()
+    _apply_provider_env_aliases()
     _apply_bridge_defaults()
     _ensure_repo_on_path()
     from rdagent.app.cli import app
