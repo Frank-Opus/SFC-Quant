@@ -1,5 +1,6 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
 import { Bot, FileCode2, FolderOpen, Sparkles, TerminalSquare } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { Button } from "../ui/button";
 import { useLocale } from "../../lib/i18n";
@@ -12,6 +13,9 @@ type StrategyFactoryPanelProps = {
   onToggle: (enabled: boolean) => Promise<void>;
   onGenerate: () => Promise<void>;
 };
+
+type ProviderFilter = "all" | "effective" | "ready" | "issues";
+type ArtifactFilter = "all" | "report" | "code" | "notes";
 
 function badgeColor(enabled: boolean): "green" | "amber" {
   return enabled ? "green" : "amber";
@@ -44,6 +48,8 @@ export function StrategyFactoryPanel({
   onGenerate,
 }: StrategyFactoryPanelProps) {
   const { t, formatDateTime } = useLocale();
+  const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
+  const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("all");
   const generationIsActive = status.generation.status === "running";
   const currentArtifacts = status.generation.artifacts.slice(0, 4);
   const currentLogs = [...status.generation.logs].slice(-3).reverse();
@@ -62,6 +68,60 @@ export function StrategyFactoryPanel({
     return translated === key ? provider.availability : translated;
   };
 
+  const providerRows = useMemo(() => {
+    switch (providerFilter) {
+      case "effective":
+        return status.providers.filter((provider) => provider.effective);
+      case "ready":
+        return status.providers.filter((provider) => provider.availability === "ready");
+      case "issues":
+        return status.providers.filter((provider) =>
+          ["fallback", "unavailable"].includes(provider.availability),
+        );
+      default:
+        return status.providers;
+    }
+  }, [providerFilter, status.providers]);
+
+  const artifactRows = useMemo(() => {
+    if (artifactFilter === "all") {
+      return artifacts;
+    }
+
+    const reportKinds = new Set(["report", "analysis", "review"]);
+    const codeKinds = new Set(["strategy", "code", "python"]);
+    const noteKinds = new Set(["notes", "memo", "log"]);
+
+    return artifacts.filter((artifact) => {
+      const kinds = artifact.files.map((file) => file.kind.toLowerCase());
+      if (artifactFilter === "report") {
+        return kinds.some((kind) => reportKinds.has(kind));
+      }
+      if (artifactFilter === "code") {
+        return kinds.some((kind) => codeKinds.has(kind));
+      }
+      return kinds.some((kind) => noteKinds.has(kind));
+    });
+  }, [artifactFilter, artifacts]);
+
+  const generationTimeline = useMemo(
+    () => [
+      "idle",
+      "preparing",
+      "writing_artifacts",
+      "invoking_provider",
+      "collecting_artifacts",
+      "completed",
+    ].map((phase) => ({
+      phase,
+      active: status.generation.phase === phase,
+      reached:
+        status.generation.phase === phase ||
+        ["completed", "failed", "timeout"].includes(status.generation.status),
+    })),
+    [status.generation.phase, status.generation.status],
+  );
+
   return (
     <div className="extension-card strategy-factory-card" data-testid="strategy-factory-panel">
       <div className="extension-card-headline">
@@ -77,6 +137,25 @@ export function StrategyFactoryPanel({
       <p className="quiet-copy clamp-2 copy-break" title={status.reason ?? t("strategy.ready")}>
         {status.reason ?? t("strategy.ready")}
       </p>
+
+      <div className="strategy-health-strip">
+        <article className="strategy-health-card">
+          <span>{t("strategy.health.readyProviders")}</span>
+          <strong>{status.providers.filter((provider) => provider.availability === "ready").length}/{status.providers.length}</strong>
+        </article>
+        <article className="strategy-health-card">
+          <span>{t("strategy.health.runtimeArtifacts")}</span>
+          <strong>{status.generation.artifacts.length}</strong>
+        </article>
+        <article className="strategy-health-card">
+          <span>{t("strategy.health.logs")}</span>
+          <strong>{status.generation.logs.length}</strong>
+        </article>
+        <article className="strategy-health-card">
+          <span>{t("strategy.health.recentArtifacts")}</span>
+          <strong>{artifacts.length}</strong>
+        </article>
+      </div>
 
       <div className="macro-regime-row">
         <div>
@@ -107,6 +186,19 @@ export function StrategyFactoryPanel({
             <small>{t("strategy.generation.updated", { time: formatDateTime(status.generation.updated_at) })}</small>
           ) : null}
         </div>
+      </div>
+
+      <div className="strategy-phase-strip">
+        {generationTimeline.map((item) => (
+          <div
+            className="strategy-phase-pill"
+            data-active={item.active}
+            data-reached={item.reached}
+            key={item.phase}
+          >
+            {resolvePhaseLabel(item.phase as StrategyFactoryStatusResponse["generation"]["phase"])}
+          </div>
+        ))}
       </div>
 
       <div className="strategy-meta-grid">
@@ -148,13 +240,48 @@ export function StrategyFactoryPanel({
         </Button>
       </div>
 
+      <div className="strategy-controlbar">
+        <div className="strategy-control-group">
+          <span className="section-label">{t("strategy.filterProviders")}</span>
+          <div className="strategy-chip-row">
+            {(["all", "effective", "ready", "issues"] as ProviderFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="strategy-chip"
+                data-active={providerFilter === filter}
+                key={filter}
+                onClick={() => setProviderFilter(filter)}
+              >
+                {t(`strategy.providerFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="strategy-control-group">
+          <span className="section-label">{t("strategy.filterArtifacts")}</span>
+          <div className="strategy-chip-row">
+            {(["all", "report", "code", "notes"] as ArtifactFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="strategy-chip"
+                data-active={artifactFilter === filter}
+                key={filter}
+                onClick={() => setArtifactFilter(filter)}
+              >
+                {t(`strategy.artifactFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <section className="source-block strategy-artifact-block">
         <div className="evidence-block-head">
           <Bot size={16} />
           <strong>{t("strategy.providers")}</strong>
         </div>
         <div className="artifact-list">
-          {status.providers.map((provider) => (
+          {providerRows.map((provider) => (
             <article className="source-row artifact-row" key={provider.provider}>
               <div>
                 <span className="section-label">{provider.label}</span>
@@ -172,6 +299,7 @@ export function StrategyFactoryPanel({
               </Badge>
             </article>
           ))}
+          {providerRows.length === 0 ? <div className="empty-state">{t("strategy.noFilteredProviders")}</div> : null}
         </div>
       </section>
 
@@ -230,7 +358,7 @@ export function StrategyFactoryPanel({
           <strong>{t("strategy.recent")}</strong>
         </div>
         <div className="artifact-list">
-          {artifacts.map((artifact) => (
+          {artifactRows.map((artifact) => (
             <article className="source-row artifact-row" key={artifact.artifact_id}>
               <div>
                 <span className="section-label">{artifact.recommendation}</span>
@@ -247,6 +375,9 @@ export function StrategyFactoryPanel({
               </span>
             </article>
           ))}
+          {artifactRows.length === 0 ? (
+            <div className="empty-state">{t("strategy.noFilteredArtifacts")}</div>
+          ) : null}
           {artifacts.length === 0 ? (
             <div className="empty-state">{t("strategy.empty")}</div>
           ) : null}

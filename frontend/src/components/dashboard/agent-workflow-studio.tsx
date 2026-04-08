@@ -60,6 +60,8 @@ type DetailView = {
 };
 
 type StatusTone = "stable" | "active" | "warning" | "danger";
+type EventFilter = "all" | "agent" | "market" | "risk" | "execution" | "strategy";
+type ProviderFilter = "all" | "effective" | "ready" | "issues";
 
 type StagePoint = { x: number; y: number };
 
@@ -221,6 +223,8 @@ export function AgentWorkflowStudio({
   const snapshot = workflow;
   const [selection, setSelection] = useState<StudioSelection>("core");
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
 
   const roleMap = useMemo(
     () => new Map((snapshot?.roles ?? []).map((role) => [role.role, role])),
@@ -253,6 +257,68 @@ export function AgentWorkflowStudio({
         .slice(0, 6),
     [eventFeed],
   );
+
+  const filteredEvents = useMemo(() => {
+    if (eventFilter === "all") {
+      return recentEvents;
+    }
+
+    return recentEvents.filter((event) => event.event_type.startsWith(`${eventFilter}.`));
+  }, [eventFilter, recentEvents]);
+
+  const filteredProviders = useMemo(() => {
+    const providers = snapshot?.providers ?? [];
+    switch (providerFilter) {
+      case "effective":
+        return providers.filter((provider) => provider.effective);
+      case "ready":
+        return providers.filter((provider) => provider.availability === "ready");
+      case "issues":
+        return providers.filter((provider) =>
+          ["fallback", "unavailable", "degraded", "timeout"].includes(provider.availability) ||
+          ["failed", "blocked", "degraded", "offline"].includes(provider.status),
+        );
+      default:
+        return providers;
+    }
+  }, [providerFilter, snapshot?.providers]);
+
+  const studioHealth = useMemo(() => {
+    if (!snapshot) {
+      return [];
+    }
+
+    const stages = Object.values(snapshot.stages);
+    const runningStages = stages.filter((stage) => stage.status === "running").length;
+    const warningStages = stages.filter((stage) =>
+      ["blocked", "degraded", "failed"].includes(stage.status),
+    ).length;
+    const readyProviders = snapshot.providers.filter((provider) => provider.availability === "ready").length;
+    const activeRoles = snapshot.roles.filter((role) => role.status !== "idle").length;
+
+    return [
+      {
+        id: "stages",
+        label: t("workflowStudio.health.runningStages"),
+        value: `${runningStages}/${stages.length}`,
+      },
+      {
+        id: "providers",
+        label: t("workflowStudio.health.readyProviders"),
+        value: `${readyProviders}/${snapshot.providers.length}`,
+      },
+      {
+        id: "roles",
+        label: t("workflowStudio.health.liveRoles"),
+        value: `${activeRoles}/${snapshot.roles.length || ROLE_ORDER.length}`,
+      },
+      {
+        id: "warnings",
+        label: t("workflowStudio.health.watchItems"),
+        value: String(warningStages + snapshot.notices.length),
+      },
+    ];
+  }, [snapshot, t]);
 
   const summaryTiles = useMemo(() => {
     if (!snapshot) {
@@ -542,6 +608,50 @@ export function AgentWorkflowStudio({
         ))}
       </div>
 
+      <div className="workflow-studio-health-strip">
+        {studioHealth.map((item) => (
+          <article className="workflow-studio-health-card" key={item.id}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </article>
+        ))}
+      </div>
+
+      <div className="workflow-studio-controlbar">
+        <div className="workflow-studio-control-group">
+          <span className="section-label">{t("workflowStudio.filterProviders")}</span>
+          <div className="workflow-studio-chip-row">
+            {(["all", "effective", "ready", "issues"] as ProviderFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="workflow-studio-chip"
+                data-active={providerFilter === filter}
+                key={filter}
+                onClick={() => setProviderFilter(filter)}
+              >
+                {t(`workflowStudio.providerFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="workflow-studio-control-group">
+          <span className="section-label">{t("workflowStudio.filterEvents")}</span>
+          <div className="workflow-studio-chip-row">
+            {(["all", "agent", "market", "risk", "execution", "strategy"] as EventFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="workflow-studio-chip"
+                data-active={eventFilter === filter}
+                key={filter}
+                onClick={() => setEventFilter(filter)}
+              >
+                {t(`workflowStudio.eventFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="workflow-star-shell" data-drawer-open={drawerOpen}>
         <div className="workflow-star-main">
           <section className="workflow-star-stage-shell">
@@ -725,11 +835,11 @@ export function AgentWorkflowStudio({
                   <span className="section-label">{t("workflowStudio.providerDock")}</span>
                   <strong>{t("workflow.providers")}</strong>
                 </div>
-                <Badge color="cyan">{snapshot.providers.length}</Badge>
+                <Badge color="cyan">{filteredProviders.length}</Badge>
               </div>
               <div className="workflow-star-provider-dock">
-                {snapshot.providers.length > 0 ? (
-                  snapshot.providers.map((provider) => {
+                {filteredProviders.length > 0 ? (
+                  filteredProviders.map((provider) => {
                     const Icon = providerIcon(provider.provider);
                     return (
                       <button
@@ -763,7 +873,7 @@ export function AgentWorkflowStudio({
                     );
                   })
                 ) : (
-                  <div className="empty-state">{t("workflow.noProviders")}</div>
+                  <div className="empty-state">{t("workflowStudio.noFilteredProviders")}</div>
                 )}
               </div>
             </section>
@@ -774,11 +884,11 @@ export function AgentWorkflowStudio({
                   <span className="section-label">{t("workflowStudio.missionLog")}</span>
                   <strong>{t("agentOps.recentEvents")}</strong>
                 </div>
-                <Badge color="cyan">{recentEvents.length}</Badge>
+                <Badge color="cyan">{filteredEvents.length}</Badge>
               </div>
               <div className="workflow-star-log-list">
-                {recentEvents.length > 0 ? (
-                  recentEvents.map((event) => (
+                {filteredEvents.length > 0 ? (
+                  filteredEvents.map((event) => (
                     <article className="workflow-star-log-row" key={event.event_id}>
                       <div className="workflow-star-log-head">
                         <span>{event.event_type}</span>
@@ -790,7 +900,7 @@ export function AgentWorkflowStudio({
                     </article>
                   ))
                 ) : (
-                  <div className="empty-state">{t("workflowStudio.noEvents")}</div>
+                  <div className="empty-state">{t("workflowStudio.noFilteredEvents")}</div>
                 )}
               </div>
             </section>
