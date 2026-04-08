@@ -1,5 +1,6 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
 import { BarChart3, RotateCcw } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { Button } from "../ui/button";
 import { useLocale } from "../../lib/i18n";
@@ -11,6 +12,8 @@ type PerformancePanelProps = {
   pendingAction: string | null;
   onRunBacktest: () => Promise<void>;
 };
+
+type TradeFilter = "all" | "wins" | "losses";
 
 function toneColor(value: number): "green" | "amber" | "red" {
   if (value > 0) {
@@ -137,6 +140,43 @@ export function PerformancePanel({
   onRunBacktest,
 }: PerformancePanelProps) {
   const { t } = useLocale();
+  const [tradeFilter, setTradeFilter] = useState<TradeFilter>("all");
+
+  const performanceHealth = useMemo(
+    () => [
+      {
+        id: "paperReturn",
+        label: t("performance.health.paperReturn"),
+        value: `${(paperReport.total_return * 100).toFixed(2)}%`,
+      },
+      {
+        id: "paperTrades",
+        label: t("performance.health.paperTrades"),
+        value: String(paperReport.trade_count),
+      },
+      {
+        id: "backtestTrades",
+        label: t("performance.health.backtestTrades"),
+        value: String(backtestReport?.trade_count ?? 0),
+      },
+      {
+        id: "backtestAvailable",
+        label: t("performance.health.backtestReady"),
+        value: backtestReport ? "YES" : "NO",
+      },
+    ],
+    [backtestReport, paperReport.total_return, paperReport.trade_count, t],
+  );
+
+  const filterTrades = (report: PerformanceReport) => {
+    if (tradeFilter === "wins") {
+      return report.trades.filter((trade) => trade.pnl > 0);
+    }
+    if (tradeFilter === "losses") {
+      return report.trades.filter((trade) => trade.pnl < 0);
+    }
+    return report.trades;
+  };
 
   return (
     <div className="extension-card performance-panel-card">
@@ -152,6 +192,15 @@ export function PerformancePanel({
         {t("performance.description")}
       </p>
 
+      <div className="performance-health-strip">
+        {performanceHealth.map((item) => (
+          <article className="performance-health-card" key={item.id}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </article>
+        ))}
+      </div>
+
       <div className="operator-actions two-up strategy-actions">
         <Button onClick={() => void onRunBacktest()} disabled={Boolean(pendingAction)}>
           <RotateCcw size={16} />
@@ -159,10 +208,29 @@ export function PerformancePanel({
         </Button>
       </div>
 
+      <div className="performance-controlbar">
+        <div className="performance-control-group">
+          <span className="section-label">{t("performance.filterTrades")}</span>
+          <div className="performance-chip-row">
+            {(["all", "wins", "losses"] as TradeFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="performance-chip"
+                data-active={tradeFilter === filter}
+                key={filter}
+                onClick={() => setTradeFilter(filter)}
+              >
+                {t(`performance.tradeFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="performance-grid">
-        <PerformanceCard label={t("performance.paper")} report={paperReport} />
+        <PerformanceCard label={t("performance.paper")} report={{ ...paperReport, trades: filterTrades(paperReport) }} />
         {backtestReport ? (
-          <PerformanceCard label={t("performance.backtest")} report={backtestReport} />
+          <PerformanceCard label={t("performance.backtest")} report={{ ...backtestReport, trades: filterTrades(backtestReport) }} />
         ) : (
           <section className="source-block performance-card-block performance-card-block--empty">
             <div className="evidence-block-head">

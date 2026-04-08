@@ -1,5 +1,6 @@
 import { Badge } from "@tremor/react/dist/components/text-elements/Badge/Badge";
 import { Globe2, Newspaper, Radar, ShieldAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { useLocale } from "../../lib/i18n";
 import type { AgentAnalysisResult } from "../../lib/market";
@@ -21,8 +22,11 @@ type ThesisEvidencePanelProps = {
   macroRole: AgentAnalysisResult | null;
 };
 
+type SourceFilter = "all" | "news" | "macro" | "local";
+
 export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
   const { t, formatDateTime, formatNumber } = useLocale();
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
 
   if (!macroRole) {
     return (
@@ -40,6 +44,15 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
   }
 
   const thesis = macroRole.macro_thesis;
+  const filteredSources = useMemo(() => {
+    if (sourceFilter === "all") {
+      return macroRole.sources;
+    }
+    if (sourceFilter === "local") {
+      return macroRole.sources.filter((source) => !source.url);
+    }
+    return macroRole.sources.filter((source) => source.kind.toLowerCase().includes(sourceFilter));
+  }, [macroRole.sources, sourceFilter]);
 
   return (
     <div className="extension-card thesis-evidence-card">
@@ -72,6 +85,44 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
           </div>
         </div>
       ) : null}
+
+      <div className="thesis-health-strip">
+        <article className="thesis-health-card">
+          <span>{t("macro.health.catalysts")}</span>
+          <strong>{String(thesis?.catalysts.length ?? macroRole.evidence.length)}</strong>
+        </article>
+        <article className="thesis-health-card">
+          <span>{t("macro.health.watchItems")}</span>
+          <strong>{String(thesis?.watch_items.length ?? 0)}</strong>
+        </article>
+        <article className="thesis-health-card">
+          <span>{t("macro.health.sources")}</span>
+          <strong>{String(macroRole.sources.length)}</strong>
+        </article>
+        <article className="thesis-health-card">
+          <span>{t("macro.health.updated")}</span>
+          <strong>{formatDateTime(macroRole.generated_at)}</strong>
+        </article>
+      </div>
+
+      <div className="thesis-controlbar">
+        <div className="thesis-control-group">
+          <span className="section-label">{t("macro.filterSources")}</span>
+          <div className="thesis-chip-row">
+            {(["all", "news", "macro", "local"] as SourceFilter[]).map((filter) => (
+              <button
+                type="button"
+                className="thesis-chip"
+                data-active={sourceFilter === filter}
+                key={filter}
+                onClick={() => setSourceFilter(filter)}
+              >
+                {t(`macro.sourceFilter.${filter}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <div className="evidence-grid">
         <section className="evidence-block">
@@ -137,7 +188,7 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
           <strong>{t("macro.sources")}</strong>
         </div>
         <div className="source-list">
-          {macroRole.sources.map((source) => (
+          {filteredSources.map((source) => (
             <article className="source-row" key={`${source.title}-${source.url ?? source.note ?? "note"}`}>
               <div>
                 <span className="section-label">{source.kind}</span>
@@ -160,6 +211,7 @@ export function ThesisEvidencePanel({ macroRole }: ThesisEvidencePanelProps) {
               )}
             </article>
           ))}
+          {filteredSources.length === 0 ? <div className="empty-state">{t("macro.emptyFiltered")}</div> : null}
         </div>
       </section>
     </div>

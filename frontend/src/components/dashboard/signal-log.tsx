@@ -1,4 +1,5 @@
 import { Activity, AlertTriangle, Bot, ShieldAlert, TrendingUp, Wrench } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { useLocale } from "../../lib/i18n";
 import type { AnalysisRunResult, EventEnvelope } from "../../lib/market";
@@ -13,6 +14,8 @@ type SignalLogProps = {
     tone: "risk" | "agent" | "execution" | "market" | "system" | "strategy";
   };
 };
+
+type SignalFilter = "all" | "agent" | "execution" | "risk" | "strategy";
 
 function EventIcon({ tone }: { tone: "risk" | "agent" | "execution" | "market" | "system" | "strategy" }) {
   if (tone === "risk") {
@@ -35,6 +38,14 @@ function EventIcon({ tone }: { tone: "risk" | "agent" | "execution" | "market" |
 
 export function SignalLog({ events, latestAnalysis, describeEvent, summarizeEvent }: SignalLogProps) {
   const { t, formatRecommendation, formatTime } = useLocale();
+  const [filter, setFilter] = useState<SignalFilter>("all");
+
+  const filteredEvents = useMemo(() => {
+    if (filter === "all") {
+      return events;
+    }
+    return events.filter((event) => summarizeEvent(event).tone === filter);
+  }, [events, filter, summarizeEvent]);
 
   return (
     <div className="analytics-card signal-log-card">
@@ -57,8 +68,24 @@ export function SignalLog({ events, latestAnalysis, describeEvent, summarizeEven
             : t("analytics.signalLog.waiting")}
         </p>
       </div>
+      <div className="signal-log-controlbar">
+        <span className="section-label">{t("analytics.signalLog.filter")}</span>
+        <div className="signal-log-chip-row">
+          {(["all", "agent", "execution", "risk", "strategy"] as SignalFilter[]).map((option) => (
+            <button
+              type="button"
+              className="signal-log-chip"
+              data-active={filter === option}
+              key={option}
+              onClick={() => setFilter(option)}
+            >
+              {t(`analytics.signalLog.filter.${option}`)}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="signal-log-list">
-        {events.map((event) => {
+        {filteredEvents.map((event) => {
           const summary = summarizeEvent(event);
           return (
             <article
@@ -80,6 +107,7 @@ export function SignalLog({ events, latestAnalysis, describeEvent, summarizeEven
             </article>
           );
         })}
+        {filteredEvents.length === 0 ? <div className="empty-state">{t("analytics.signalLog.emptyFiltered")}</div> : null}
       </div>
     </div>
   );

@@ -1267,6 +1267,91 @@ button {
   gap: 0.9rem;
 }
 
+.performance-health-strip,
+.performance-controlbar,
+.performance-control-group,
+.signal-log-controlbar,
+.thesis-health-strip,
+.thesis-controlbar,
+.thesis-control-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.performance-health-strip,
+.thesis-health-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.performance-health-card,
+.performance-controlbar,
+.signal-log-controlbar,
+.thesis-health-card,
+.thesis-controlbar {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.performance-health-card,
+.thesis-health-card {
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.performance-health-card span,
+.performance-control-group span,
+.signal-log-controlbar span,
+.thesis-health-card span,
+.thesis-control-group span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.performance-controlbar,
+.thesis-controlbar {
+  grid-template-columns: 1fr;
+  padding: 0.9rem 1rem;
+}
+
+.performance-chip-row,
+.signal-log-chip-row,
+.thesis-chip-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.performance-chip,
+.signal-log-chip,
+.thesis-chip {
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.performance-chip:hover,
+.performance-chip[data-active="true"],
+.signal-log-chip:hover,
+.signal-log-chip[data-active="true"],
+.thesis-chip:hover,
+.thesis-chip[data-active="true"] {
+  color: var(--text-main);
+  border-color: rgba(121, 243, 255, 0.28);
+  background: linear-gradient(180deg, rgba(121, 243, 255, 0.12), rgba(255, 255, 255, 0.04));
+  transform: translateY(-1px);
+}
+
 .performance-card-block--empty {
   align-content: start;
 }
@@ -1315,6 +1400,16 @@ button {
 
 .signal-log-headline {
   margin-bottom: 0.9rem;
+}
+
+.signal-log-controlbar {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
 }
 
 .signal-item {
@@ -3001,8 +3096,18 @@ button {
 
 .workspace-header-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
   gap: 1rem;
+  align-items: flex-start;
+}
+
+.workspace-header-upper,
+.workspace-header-lower {
+  display: grid;
+  gap: 1rem;
+}
+
+.workspace-header-upper {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
   align-items: flex-start;
 }
 
@@ -3050,6 +3155,7 @@ button {
 
 .overview-secondary-stack {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -3107,6 +3213,19 @@ button {
 
 .overview-quick-actions {
   margin-top: 0.75rem;
+}
+
+.workspace-header-actions {
+  display: grid;
+  align-content: start;
+}
+
+.workspace-header-actions .operator-actions {
+  margin-top: 0;
+}
+
+.workspace-header-actions .compact-actions-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .two-column-grid {
@@ -3251,11 +3370,13 @@ button {
 
   .agent-runtime-stats,
   .performance-metric-grid,
+  .performance-health-strip,
   .agent-runtime-health-strip,
   .agent-runtime-controlbar,
   .strategy-health-strip,
   .strategy-controlbar,
   .strategy-phase-strip,
+  .thesis-health-strip,
   .macro-health-strip,
   .macro-controlbar {
     grid-template-columns: 1fr;
@@ -3277,7 +3398,10 @@ button {
   .overview-grid,
   .overview-grid--focus,
   .two-column-grid,
-  .workspace-header-card {
+  .workspace-header-card,
+  .workspace-header-upper,
+  .workspace-header-lower,
+  .overview-secondary-stack {
     grid-template-columns: 1fr;
   }
 
@@ -3339,6 +3463,10 @@ button {
 
   .terminal-status-chip {
     padding: 0.6rem 0.7rem;
+  }
+
+  .workspace-header-actions .compact-actions-grid {
+    grid-template-columns: 1fr;
   }
 
   .terminal-locale-switcher {

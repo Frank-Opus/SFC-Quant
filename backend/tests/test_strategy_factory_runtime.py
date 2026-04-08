@@ -541,13 +541,115 @@ def test_strategy_generation_marks_provider_validation_mode_honestly(
     get_settings.cache_clear()
 
 
+def test_strategy_factory_allocates_unique_directories_for_same_timestamp(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    get_settings.cache_clear()
+
+    with TestClient(app):
+        service = app.state.strategy_factory_service
+        created_at = service.status().generation.started_at or service.agent_runtime().generated_at
+        first_dir = service._allocate_artifact_dir(
+            created_at=created_at,
+            symbol="BTC/USDT",
+            timeframe="1m",
+            run_id="11111111-aaaa-bbbb-cccc-000000000001",
+        )
+        second_dir = service._allocate_artifact_dir(
+            created_at=created_at,
+            symbol="BTC/USDT",
+            timeframe="1m",
+            run_id="11111111-aaaa-bbbb-cccc-000000000001",
+        )
+
+    assert first_dir.exists()
+    assert second_dir.exists()
+    assert first_dir != second_dir
+    assert second_dir.name.startswith(first_dir.name.split("-11111111")[0])
+
+    get_settings.cache_clear()
+
+
+def test_strategy_generation_keeps_provider_snapshot_when_config_changes(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_strategy_env(monkeypatch, tmp_path)
+    fake_rd_agent = write_fake_rd_agent(tmp_path)
+    fake_tradingagents = write_fake_tradingagents(tmp_path)
+    monkeypatch.setenv("STRATEGY_FACTORY_PROVIDER", "rd_agent_q")
+    monkeypatch.setenv("STRATEGY_FACTORY_RD_AGENT_COMMAND", str(fake_rd_agent))
+    monkeypatch.setenv("STRATEGY_FACTORY_TRADINGAGENTS_COMMAND", str(fake_tradingagents))
+    get_settings.cache_clear()
+
+    original_write_artifact = StrategyFactoryService._write_artifact
+
+    def delayed_write_artifact(
+        self,
+        *,
+        analysis,
+        notes,
+        configured_provider,
+        effective_provider,
+    ):
+        time.sleep(0.3)
+        return original_write_artifact(
+            self,
+            analysis=analysis,
+            notes=notes,
+            configured_provider=configured_provider,
+            effective_provider=effective_provider,
+        )
+
+    monkeypatch.setattr(StrategyFactoryService, "_write_artifact", delayed_write_artifact)
+
+    with TestClient(app) as client:
+        analysis_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "provider snapshot"},
+        )
+
+        result: dict[str, object] = {}
+
+        def run_generate() -> None:
+            result["response"] = client.post(
+                "/api/strategy/generate",
+                json={"symbol": "BTC/USDT", "timeframe": "1m", "notes": "provider snapshot"},
+            )
+
+        worker = threading.Thread(target=run_generate)
+        worker.start()
+        time.sleep(0.1)
+        config_response = client.post(
+            "/api/strategy/config",
+            json={"provider": "tradingagents_cn"},
+        )
+        worker.join()
+
+    assert analysis_response.status_code == 200
+    assert config_response.status_code == 200
+    assert result["response"].status_code == 200
+    artifact = result["response"].json()["artifact"]
+    assert artifact["configured_provider"] == "rd_agent_q"
+    assert artifact["effective_provider"] == "rd_agent_q"
+    assert artifact["provider_run"]["provider"] == "rd_agent_q"
+
+    get_settings.cache_clear()
+
+
 def test_strategy_generation_does_not_block_health_route(monkeypatch, tmp_path: Path) -> None:
     configure_strategy_env(monkeypatch, tmp_path)
     original_write_artifact = StrategyFactoryService._write_artifact
 
-    def slow_write_artifact(self, *, analysis, notes):
+    def slow_write_artifact(self, *, analysis, notes, configured_provider, effective_provider):
         time.sleep(1.5)
-        return original_write_artifact(self, analysis=analysis, notes=notes)
+        return original_write_artifact(
+            self,
+            analysis=analysis,
+            notes=notes,
+            configured_provider=configured_provider,
+            effective_provider=effective_provider,
+        )
 
     monkeypatch.setattr(StrategyFactoryService, "_write_artifact", slow_write_artifact)
     get_settings.cache_clear()
@@ -588,9 +690,15 @@ def test_strategy_status_exposes_running_generation_state(
     configure_strategy_env(monkeypatch, tmp_path)
     original_write_artifact = StrategyFactoryService._write_artifact
 
-    def slow_write_artifact(self, *, analysis, notes):
+    def slow_write_artifact(self, *, analysis, notes, configured_provider, effective_provider):
         time.sleep(1.0)
-        return original_write_artifact(self, analysis=analysis, notes=notes)
+        return original_write_artifact(
+            self,
+            analysis=analysis,
+            notes=notes,
+            configured_provider=configured_provider,
+            effective_provider=effective_provider,
+        )
 
     monkeypatch.setattr(StrategyFactoryService, "_write_artifact", slow_write_artifact)
     get_settings.cache_clear()

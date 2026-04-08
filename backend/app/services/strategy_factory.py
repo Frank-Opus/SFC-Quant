@@ -266,6 +266,7 @@ class StrategyFactoryService:
             )
 
         effective_provider = self._effective_provider()
+        configured_provider = self._configured_provider
         detail = self._provider_generation_detail(effective_provider)
         self._set_generation_state(
             status="running",
@@ -297,6 +298,8 @@ class StrategyFactoryService:
                 self._write_artifact,
                 analysis=analysis,
                 notes=payload.notes,
+                configured_provider=configured_provider,
+                effective_provider=effective_provider,
             )
         except Exception as exc:
             current_status = "timeout" if "timed out" in str(exc).lower() else "failed"
@@ -586,16 +589,17 @@ class StrategyFactoryService:
         *,
         analysis: AnalysisRunResult,
         notes: str | None,
+        configured_provider: str,
+        effective_provider: StrategyProvider,
     ) -> StrategyArtifact:
         created_at = datetime.now(timezone.utc)
         artifact_id = str(uuid4())
-        directory_name = (
-            f"{created_at.strftime('%Y%m%dT%H%M%SZ')}-"
-            f"{analysis.symbol.lower().replace('/', '-').replace(':', '-')}-"
-            f"{analysis.timeframe}"
+        artifact_dir = self._allocate_artifact_dir(
+            created_at=created_at,
+            symbol=analysis.symbol,
+            timeframe=analysis.timeframe,
+            run_id=analysis.run_id,
         )
-        artifact_dir = self._workspace / directory_name
-        artifact_dir.mkdir(parents=True, exist_ok=False)
         self._set_generation_state(
             status="running",
             phase="writing_artifacts",
@@ -615,8 +619,6 @@ class StrategyFactoryService:
             else macro_output.summary if macro_output else "Macro context unavailable."
         )
         summary = risk_output.summary if risk_output else "No strategy summary available."
-        effective_provider = self._effective_provider()
-
         files = [
             StrategyArtifactFile(path=str(artifact_dir / "strategy.md"), kind="markdown"),
             StrategyArtifactFile(path=str(artifact_dir / "strategy.json"), kind="json"),
@@ -628,7 +630,7 @@ class StrategyFactoryService:
             timeframe=analysis.timeframe,
             run_id=analysis.run_id,
             created_at=created_at,
-            configured_provider=self._configured_provider,
+            configured_provider=configured_provider,
             effective_provider=effective_provider,
             recommendation=analysis.overall_recommendation,
             summary=summary,
@@ -644,7 +646,7 @@ class StrategyFactoryService:
                 f"- Timeframe: {analysis.timeframe}",
                 f"- Run ID: {analysis.run_id}",
                 f"- Recommendation: {analysis.overall_recommendation}",
-                f"- Configured provider: {self._configured_provider}",
+                f"- Configured provider: {configured_provider}",
                 f"- Effective provider: {effective_provider}",
                 "",
                 "## Risk Summary",
@@ -740,6 +742,30 @@ class StrategyFactoryService:
             encoding="utf-8",
         )
         return artifact
+
+    def _allocate_artifact_dir(
+        self,
+        *,
+        created_at: datetime,
+        symbol: str,
+        timeframe: str,
+        run_id: str,
+    ) -> Path:
+        symbol_slug = symbol.lower().replace("/", "-").replace(":", "-")
+        timestamp = created_at.strftime("%Y%m%dT%H%M%S%fZ")
+        run_suffix = run_id.split("-", 1)[0]
+
+        for attempt in range(100):
+            suffix = "" if attempt == 0 else f"-{attempt + 1}"
+            directory_name = f"{timestamp}-{symbol_slug}-{timeframe}-{run_suffix}{suffix}"
+            artifact_dir = self._workspace / directory_name
+            try:
+                artifact_dir.mkdir(parents=True, exist_ok=False)
+            except FileExistsError:
+                continue
+            return artifact_dir
+
+        raise RuntimeError("Unable to allocate a unique strategy artifact directory.")
 
     def _external_provider_is_available(self, spec: ExternalProviderSpec) -> bool:
         return self._external_provider_unavailable_reason(spec) is None

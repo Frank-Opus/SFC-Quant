@@ -911,6 +911,33 @@ export default function App() {
       tone: "info" as const,
     },
   ];
+  const thesisTruthItems = [
+    {
+      id: "thesis-recommendation",
+      label: t("thesis.recommendation"),
+      value: latestAnalysis
+        ? formatRecommendation(latestAnalysis.overall_recommendation, {
+            uppercase: true,
+          })
+        : t("thesis.pending"),
+      detail: latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty"),
+      tone: latestAnalysis ? ("success" as const) : ("default" as const),
+    },
+    {
+      id: "thesis-provider",
+      label: t("hero.aiProvider"),
+      value: latestAnalysis?.provider ?? heroProviderLabel,
+      detail: latestAnalysis?.model ?? snapshot.runtime.ai_model ?? snapshot.runtime.ai_provider,
+      tone: "info" as const,
+    },
+    {
+      id: "thesis-workflow",
+      label: t("workflow.active"),
+      value: workflowStageLabel,
+      detail: workflowStageDetail,
+      tone: "info" as const,
+    },
+  ];
   const analyticsTruthItems = [
     {
       id: "analytics-symbol",
@@ -983,6 +1010,102 @@ export default function App() {
       tone: snapshot.runtime.warnings.length > 0 ? ("warning" as const) : ("success" as const),
     },
   ];
+  const readyWorkflowProviders =
+    workflow?.providers.filter((provider) => provider.availability === "ready").length ?? 0;
+  const effectiveWorkflowProvider =
+    workflow?.providers.find((provider) => provider.effective) ?? null;
+  const workflowHeaderTruthItems = [
+    {
+      id: "workflow-stage-summary",
+      label: t("workflow.active"),
+      value: workflowStageLabel,
+      detail: workflowStageDetail,
+      tone: "info" as const,
+    },
+    {
+      id: "workflow-provider-summary",
+      label: t("workflow.providers"),
+      value: `${readyWorkflowProviders}/${workflow?.providers.length ?? 0}`,
+      detail:
+        effectiveWorkflowProvider?.detail ??
+        (effectiveWorkflowProvider
+          ? `${t("workflow.effective")} · ${effectiveWorkflowProvider.label}`
+          : t("workflow.noProviders")),
+      tone: effectiveWorkflowProvider ? ("success" as const) : ("warning" as const),
+    },
+    {
+      id: "workflow-notices-summary",
+      label: t("workflow.notices"),
+      value: String(workflow?.notices.length ?? 0),
+      detail: workflow?.notices[0]?.detail ?? t("workflow.noNotices"),
+      tone: (workflow?.notices.length ?? 0) > 0 ? ("warning" as const) : ("success" as const),
+    },
+  ];
+  const marketHeaderTruthItems = [
+    {
+      id: "market-selected-summary",
+      label: t("marketDeck.selected"),
+      value: selectedMarket ? `${selectedMarket.symbol} · ${selectedMarket.timeframe}` : systemStatusLabel,
+      detail: selectedMarket
+        ? `${formatCurrency(selectedMarket.last_price)} · ${formatPercent(selectedMarket.change_percent)}`
+        : localizedConnectionMessage,
+      tone: "info" as const,
+    },
+    {
+      id: "market-volume-summary",
+      label: t("marketDeck.volume"),
+      value: selectedMarket ? formatCompactNumber(selectedMarket.volume_24h) : "--",
+      detail: selectedMarket ? selectedMarket.exchange_id : snapshot.runtime.exchange_id,
+      tone: "info" as const,
+    },
+    {
+      id: "market-orders-summary",
+      label: t("hero.execution"),
+      value: executionStatusLabel,
+      detail:
+        selectedRecentOrders.length > 0
+          ? `${selectedRecentOrders.length} ${t("performance.tradeCount")}`
+          : t("operator.engineReady"),
+      tone: execution.engine_status === "running" ? ("success" as const) : ("warning" as const),
+    },
+  ];
+  const overviewHeaderTruthItems = [
+    workflowTruthItems[0],
+    workflowTruthItems[1],
+    operationsTruthItems[1],
+  ];
+  const activeSectionDescription =
+    activeSection === "overview"
+      ? t("shell.overviewDescription")
+      : activeSection === "market"
+        ? t("marketDeck.description")
+        : activeSection === "thesis"
+          ? t("thesis.description")
+          : activeSection === "workflow"
+            ? t("shell.workflowDescription")
+            : activeSection === "strategy"
+              ? t("extensions.description")
+              : activeSection === "analytics"
+                ? t("analytics.description")
+                : activeSection === "operations"
+                  ? t("operator.description")
+                  : t("diagnostics.description");
+  const workspaceHeaderTruthItems =
+    activeSection === "overview"
+      ? overviewHeaderTruthItems
+      : activeSection === "market"
+        ? marketHeaderTruthItems
+        : activeSection === "thesis"
+          ? thesisTruthItems
+          : activeSection === "workflow"
+            ? workflowHeaderTruthItems
+            : activeSection === "strategy"
+              ? strategyTruthItems
+              : activeSection === "analytics"
+                ? analyticsTruthItems
+                : activeSection === "operations"
+                  ? operationsTruthItems
+                  : diagnosticsTruthItems;
 
   const marketDeckPanel = (
     <Card className="panel-card market-deck workspace-card">
@@ -1083,36 +1206,7 @@ export default function App() {
         </CardHeader>
       ) : null}
       <CardContent>
-        <SectionTruthStrip
-          items={[
-            {
-              id: "thesis-recommendation",
-              label: t("thesis.recommendation"),
-              value: latestAnalysis
-                ? formatRecommendation(latestAnalysis.overall_recommendation, {
-                    uppercase: true,
-                  })
-                : t("thesis.pending"),
-              detail: latestAnalysis?.outputs.at(-1)?.summary ?? t("thesis.empty"),
-              tone: latestAnalysis ? ("success" as const) : ("default" as const),
-            },
-            {
-              id: "thesis-provider",
-              label: t("hero.aiProvider"),
-              value: latestAnalysis?.provider ?? heroProviderLabel,
-              detail: latestAnalysis?.model ?? snapshot.runtime.ai_model ?? snapshot.runtime.ai_provider,
-              tone: "info" as const,
-            },
-            {
-              id: "thesis-workflow",
-              label: t("workflow.active"),
-              value: workflowStageLabel,
-              detail: workflowStageDetail,
-              tone: "info" as const,
-            },
-          ]}
-          compact
-        />
+        <SectionTruthStrip items={thesisTruthItems} compact />
         {latestAnalysis ? (
           <div className="thesis-layout">
             <div className="thesis-summary-card">
@@ -1219,7 +1313,6 @@ export default function App() {
       ) : null}
       <CardContent>
         <SectionTruthStrip items={strategyTruthItems} compact />
-        <div className="overview-quick-actions extension-quick-actions">{quickActionButtons}</div>
         <div className="extension-grid">
           <ThesisEvidencePanel macroRole={thesisMacroRole} />
           <MacroIntelligencePanel
@@ -1303,7 +1396,6 @@ export default function App() {
       ) : null}
       <CardContent className="operator-stack">
         <SectionTruthStrip items={operationsTruthItems} compact />
-        <div className="overview-quick-actions operator-quick-actions">{quickActionButtons}</div>
         <div className="operator-card-grid">
           <div className="operator-card">
             <div className="operator-title-row">
@@ -1698,7 +1790,6 @@ export default function App() {
             </p>
           </article>
         </div>
-        <div className="overview-quick-actions">{quickActionButtons}</div>
       </CardContent>
     </Card>
   );
@@ -1858,49 +1949,28 @@ export default function App() {
 
         <section className="terminal-main">
           <div className="workspace-header-card">
-            <div>
-              <p className="section-label">{activeNavigationItem.meta}</p>
-              <h2>{activeNavigationItem.label}</h2>
-              <p
-                className="clamp-2 copy-break"
-                title={
-                  activeSection === "overview"
-                    ? t("shell.overviewDescription")
-                    : activeSection === "market"
-                      ? t("marketDeck.description")
-                      : activeSection === "thesis"
-                        ? t("thesis.description")
-                        : activeSection === "workflow"
-                          ? t("shell.workflowDescription")
-                        : activeSection === "strategy"
-                          ? t("extensions.description")
-                          : activeSection === "analytics"
-                            ? t("analytics.description")
-                            : activeSection === "operations"
-                              ? t("operator.description")
-                              : t("diagnostics.description")
-                }
-              >
-                {activeSection === "overview"
-                  ? t("shell.overviewDescription")
-                  : activeSection === "market"
-                    ? t("marketDeck.description")
-                    : activeSection === "thesis"
-                      ? t("thesis.description")
-                      : activeSection === "workflow"
-                        ? t("shell.workflowDescription")
-                      : activeSection === "strategy"
-                        ? t("extensions.description")
-                        : activeSection === "analytics"
-                          ? t("analytics.description")
-                          : activeSection === "operations"
-                            ? t("operator.description")
-                            : t("diagnostics.description")}
-              </p>
+            <div className="workspace-header-upper">
+              <div>
+                <p className="section-label">{activeNavigationItem.meta}</p>
+                <h2>{activeNavigationItem.label}</h2>
+                <p className="clamp-2 copy-break" title={activeSectionDescription}>
+                  {activeSectionDescription}
+                </p>
+              </div>
+              <div className="workspace-header-meta" data-testid="requested-market-source">
+                <span>{t("runtime.marketRequested")}</span>
+                <strong>{marketDigestCard?.value ?? systemStatusLabel}</strong>
+                <p
+                  className="clamp-2 copy-break"
+                  title={marketDigestCard?.meta ?? localizedConnectionMessage}
+                >
+                  {marketDigestCard?.meta ?? localizedConnectionMessage}
+                </p>
+              </div>
             </div>
-            <div className="workspace-header-meta" data-testid="requested-market-source">
-              <span>{t("runtime.marketRequested")}</span>
-              <strong>{marketDigestCard?.value ?? systemStatusLabel}</strong>
+            <div className="workspace-header-lower">
+              <SectionTruthStrip items={workspaceHeaderTruthItems} compact />
+              <div className="workspace-header-actions">{quickActionButtons}</div>
             </div>
           </div>
 
