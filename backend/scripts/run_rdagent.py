@@ -38,8 +38,32 @@ def _maybe_reexec_provider_venv() -> None:
     os.execv(str(venv_python), [str(venv_python), __file__, *sys.argv[1:]])
 
 
+def _apply_bridge_defaults() -> None:
+    if not (
+        os.environ.get("DSFC_STRATEGY_INPUT_JSON")
+        and os.environ.get("DSFC_STRATEGY_ARTIFACT_DIR")
+    ):
+        return
+    if len(sys.argv) < 2 or sys.argv[1] != "fin_quant":
+        return
+    if any(arg.startswith("--loop-n") or arg.startswith("--all-duration") for arg in sys.argv[2:]):
+        return
+
+    # Bound product-internal runs so the strategy factory can return reviewable
+    # artifacts instead of entering an open-ended RD loop.
+    sys.argv.extend(
+        [
+            "--loop-n",
+            os.environ.get("RDAGENT_DSFC_LOOP_N", "1"),
+            "--all-duration",
+            os.environ.get("RDAGENT_DSFC_ALL_DURATION", "2m"),
+        ]
+    )
+
+
 def main() -> int:
     _maybe_reexec_provider_venv()
+    _apply_bridge_defaults()
     _ensure_repo_on_path()
     from rdagent.app.cli import app
 
