@@ -1,7 +1,8 @@
 import asyncio
 import json
+import time
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Callable, Protocol
 from urllib import error, request
 
 from app.core.config import Settings
@@ -44,6 +45,8 @@ class MockAIProvider:
 
 class OpenAICompatibleProvider:
     name = "openai_compatible"
+    _temporary_unavailability: dict[str, tuple[float, str]] = {}
+    _temporary_unavailability_seconds = 300.0
 
     def __init__(self, *, base_url: str, api_key: str, model: str, timeout_seconds: float) -> None:
         self._base_url = base_url.rstrip("/")
@@ -72,6 +75,9 @@ class OpenAICompatibleProvider:
         system_prompt: str,
         user_prompt: str,
     ) -> ProviderAnalysisDraft:
+        unavailable_reason = self._temporary_unavailable_reason()
+        if unavailable_reason is not None:
+            raise RuntimeError(unavailable_reason)
         last_error: RuntimeError | None = None
         for api_spec in _candidate_api_specs(
             self._base_url,
@@ -124,11 +130,38 @@ class OpenAICompatibleProvider:
                 continue
 
             parsed = _normalize_provider_payload(_extract_json_object(content), role=role)
+            self._clear_temporary_unavailability()
             return ProviderAnalysisDraft.model_validate(parsed)
 
         if last_error is not None:
+            self._record_temporary_unavailability(str(last_error))
             raise last_error
         raise RuntimeError(f"OpenAI-compatible provider failed for role {role}")
+
+    def _availability_key(self) -> str:
+        return f"{self._base_url}|{self.model}"
+
+    def _temporary_unavailable_reason(self) -> str | None:
+        entry = self._temporary_unavailability.get(self._availability_key())
+        if entry is None:
+            return None
+        unavailable_until, reason = entry
+        if unavailable_until <= time.monotonic():
+            self._temporary_unavailability.pop(self._availability_key(), None)
+            return None
+        return (
+            "OpenAI-compatible provider temporarily marked unavailable after recent failures; "
+            f"{reason}"
+        )
+
+    def _record_temporary_unavailability(self, reason: str) -> None:
+        self._temporary_unavailability[self._availability_key()] = (
+            time.monotonic() + self._temporary_unavailability_seconds,
+            reason,
+        )
+
+    def _clear_temporary_unavailability(self) -> None:
+        self._temporary_unavailability.pop(self._availability_key(), None)
 
 
 class ProviderFactory:
@@ -176,7 +209,7 @@ class _ProviderAPISpec:
     kind: str
     url: str
     payload: dict
-    extract_text: callable
+    extract_text: Callable[[dict], str]
 
 
 def _normalize_message_content(content: object) -> str:

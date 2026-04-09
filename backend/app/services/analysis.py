@@ -26,7 +26,7 @@ from app.models.market import MarketSnapshot
 from app.services.event_bus import EventBus
 from app.services.intelligence import ExternalIntelligenceService
 from app.services.market import MarketRuntimeService
-from app.services.providers import MockAIProvider, ProviderFactory
+from app.services.providers import MockAIProvider, ProviderFactory, ProviderSelection
 from app.services.run_ledger import RunLedgerService
 
 ROLE_SEQUENCE: tuple[AgentRole, ...] = (
@@ -55,6 +55,8 @@ class AnalysisService:
         self._run_ledger = run_ledger
         self._intelligence_service = intelligence_service
         self._latest_runs: dict[str, AnalysisRunResult] = {}
+        self._provider_unavailability: dict[str, tuple[float, str]] = {}
+        self._provider_unavailability_seconds = 300.0
 
     @property
     def intelligence_service(self) -> ExternalIntelligenceService:
@@ -151,6 +153,16 @@ class AnalysisService:
         )
 
         selection = self._provider_factory.resolve()
+        provider_unavailable_reason = self._provider_unavailable_reason()
+        if (
+            provider_unavailable_reason is not None
+            and not selection.fallback_reason
+            and not isinstance(selection.provider, MockAIProvider)
+        ):
+            selection = ProviderSelection(
+                provider=MockAIProvider(),
+                fallback_reason=provider_unavailable_reason,
+            )
         if selection.fallback_reason:
             await self._event_bus.publish(
                 event_type="system.warning",
@@ -263,8 +275,10 @@ class AnalysisService:
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                 )
+                self._clear_provider_unavailability(provider)
         except Exception as exc:
             status = "fallback"
+            self._record_provider_unavailability(provider, str(exc))
             await self._event_bus.publish(
                 event_type="system.warning",
                 source=f"analysis.{role}",
@@ -320,6 +334,37 @@ class AnalysisService:
             },
         )
         return result
+
+    def _provider_runtime_key(self) -> str:
+        return (
+            f"{self._settings.ai_provider}|{self._settings.ai_base_url}|{self._settings.ai_model}"
+        )
+
+    def _provider_unavailable_reason(self) -> str | None:
+        entry = self._provider_unavailability.get(self._provider_runtime_key())
+        if entry is None:
+            return None
+        unavailable_until, reason = entry
+        if unavailable_until <= time.monotonic():
+            self._provider_unavailability.pop(self._provider_runtime_key(), None)
+            return None
+        return (
+            "Configured AI provider is temporarily marked unavailable after recent runtime "
+            f"failures; {reason}"
+        )
+
+    def _record_provider_unavailability(self, provider, reason: str) -> None:
+        if isinstance(provider, MockAIProvider):
+            return
+        self._provider_unavailability[self._provider_runtime_key()] = (
+            time.monotonic() + self._provider_unavailability_seconds,
+            reason,
+        )
+
+    def _clear_provider_unavailability(self, provider) -> None:
+        if isinstance(provider, MockAIProvider):
+            return
+        self._provider_unavailability.pop(self._provider_runtime_key(), None)
 
     def _build_system_prompt(self, role: AgentRole) -> str:
         return (

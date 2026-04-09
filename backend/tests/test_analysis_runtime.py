@@ -275,6 +275,65 @@ def test_analysis_stops_retrying_provider_after_first_role_failure(monkeypatch, 
     get_settings.cache_clear()
 
 
+def test_openai_provider_temporarily_short_circuits_after_recent_failure() -> None:
+    provider = OpenAICompatibleProvider(
+        base_url="https://example.invalid/v1",
+        api_key="test-key",
+        model="test-model",
+        timeout_seconds=30.0,
+    )
+    provider._record_temporary_unavailability("Provider returned no text output")
+
+    try:
+        provider._generate_sync(
+            role="data",
+            system_prompt="system",
+            user_prompt="user",
+        )
+    except RuntimeError as exc:
+        assert "temporarily marked unavailable" in str(exc)
+        assert "Provider returned no text output" in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError("expected temporary unavailability error")
+
+
+def test_analysis_short_circuits_future_runs_after_provider_failure(monkeypatch, tmp_path: Path) -> None:
+    configure_analysis_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("AI_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("AI_API_KEY", "test-key")
+    monkeypatch.setenv("AI_BASE_URL", "https://example.invalid/v1")
+    monkeypatch.setenv("AI_MODEL", "test-model")
+    get_settings.cache_clear()
+    OpenAICompatibleProvider._temporary_unavailability.clear()
+
+    attempts = {"count": 0}
+
+    async def fail_generate(self, *, role, system_prompt, user_prompt):
+        attempts["count"] += 1
+        raise RuntimeError("mirror timeout")
+
+    monkeypatch.setattr(OpenAICompatibleProvider, "generate", fail_generate)
+
+    with TestClient(app) as client:
+        first_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+        second_response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["status"] == "fallback"
+    assert second_response.json()["status"] == "fallback"
+    assert attempts["count"] == 1
+
+    OpenAICompatibleProvider._temporary_unavailability.clear()
+    get_settings.cache_clear()
+
+
 def test_analysis_returns_fallback_when_real_market_is_unavailable(monkeypatch, tmp_path: Path) -> None:
     configure_analysis_env(monkeypatch, tmp_path)
     monkeypatch.setenv("MARKET_DATA_MODE", "real")
