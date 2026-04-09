@@ -163,6 +163,8 @@ class AnalysisService:
 
         outputs: list[AgentAnalysisResult] = []
         used_fallback = market_snapshot_fallback or bool(selection.fallback_reason)
+        active_provider = selection.provider
+        provider_fallback_active = market_snapshot_fallback or bool(selection.fallback_reason)
         for role in ROLE_SEQUENCE:
             output = await self._run_role(
                 role=role,
@@ -170,12 +172,15 @@ class AnalysisService:
                 request=request,
                 market_snapshot=market_snapshot,
                 prior_outputs=outputs,
-                configured_provider=selection.provider,
+                configured_provider=active_provider,
                 external_intelligence=external_intelligence,
-                force_fallback=market_snapshot_fallback,
+                force_fallback=provider_fallback_active,
             )
             outputs.append(output)
             used_fallback = used_fallback or output.status == "fallback"
+            if output.status == "fallback" and not isinstance(active_provider, MockAIProvider):
+                active_provider = MockAIProvider()
+                provider_fallback_active = True
 
         completed_at = datetime.now(timezone.utc)
         overall_recommendation = outputs[-1].recommendation if outputs else "hold"

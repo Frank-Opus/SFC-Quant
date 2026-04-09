@@ -1,6 +1,7 @@
 import asyncio
 import math
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
@@ -397,20 +398,35 @@ class MarketRuntimeService:
 
 
 def _fetch_ohlcv_records(exchange_class, symbol: str, timeframe: str, history_limit: int):
-    exchange = exchange_class({"enableRateLimit": True})
     proxy = (
         os.environ.get("HTTPS_PROXY")
         or os.environ.get("HTTP_PROXY")
         or os.environ.get("ALL_PROXY")
     )
-    if proxy:
-        exchange.proxies = {"http": proxy, "https": proxy}
-    try:
-        return exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=history_limit)
-    finally:
-        close_method = getattr(exchange, "close", None)
-        if callable(close_method):
-            close_method()
+    timeout_ms = int(os.environ.get("CCXT_TIMEOUT_MS", "30000"))
+    retry_count = int(os.environ.get("CCXT_FETCH_RETRIES", "3"))
+    last_error: Exception | None = None
+
+    for attempt in range(retry_count):
+        exchange = exchange_class({"enableRateLimit": True})
+        exchange.timeout = timeout_ms
+        if proxy:
+            exchange.proxies = {"http": proxy, "https": proxy}
+        try:
+            return exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=history_limit)
+        except Exception as exc:
+            last_error = exc
+            if attempt >= retry_count - 1:
+                raise
+            time.sleep(min(1.5 * (attempt + 1), 3.0))
+        finally:
+            close_method = getattr(exchange, "close", None)
+            if callable(close_method):
+                close_method()
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"Failed to fetch market data for {symbol} {timeframe}")
 
 
 def _timeframe_seconds(timeframe: str) -> int:

@@ -72,25 +72,16 @@ class OpenAICompatibleProvider:
         system_prompt: str,
         user_prompt: str,
     ) -> ProviderAnalysisDraft:
-        payload = {
-            "model": self.model,
-            "input": [
-                {
-                    "role": "system",
-                    "content": [{"type": "input_text", "text": system_prompt}],
-                },
-                {
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": user_prompt}],
-                },
-            ],
-            "text": {"format": {"type": "text"}},
-        }
         last_error: RuntimeError | None = None
-        for url in _candidate_urls(self._base_url):
+        for api_spec in _candidate_api_specs(
+            self._base_url,
+            model=self.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        ):
             req = request.Request(
-                url=url,
-                data=json.dumps(payload).encode("utf-8"),
+                url=api_spec.url,
+                data=json.dumps(api_spec.payload).encode("utf-8"),
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {self._api_key}",
@@ -105,7 +96,7 @@ class OpenAICompatibleProvider:
             except error.HTTPError as exc:  # pragma: no cover - depends on remote provider
                 detail = exc.read().decode("utf-8", errors="ignore")
                 runtime_error = RuntimeError(
-                    f"OpenAI-compatible provider request failed for role {role}: {exc.code} {detail}"
+                    f"OpenAI-compatible provider {api_spec.kind} request failed for role {role}: {exc.code} {detail}"
                 )
                 if exc.code not in {404, 405}:
                     raise runtime_error from exc
@@ -121,14 +112,14 @@ class OpenAICompatibleProvider:
                 response_payload = json.loads(body)
             except json.JSONDecodeError:
                 last_error = RuntimeError(
-                    f"OpenAI-compatible provider returned non-JSON content for role {role} from {url}"
+                    f"OpenAI-compatible provider returned non-JSON content for role {role} from {api_spec.url}"
                 )
                 continue
 
-            content = _extract_response_text(response_payload)
+            content = api_spec.extract_text(response_payload)
             if not content:
                 last_error = RuntimeError(
-                    f"Provider returned no text output for role {role} from {url}"
+                    f"Provider returned no text output for role {role} from {api_spec.url}"
                 )
                 continue
 
@@ -180,6 +171,14 @@ class ProviderFactory:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _ProviderAPISpec:
+    kind: str
+    url: str
+    payload: dict
+    extract_text: callable
+
+
 def _normalize_message_content(content: object) -> str:
     if isinstance(content, str):
         return content
@@ -219,6 +218,31 @@ def _extract_response_text(payload: dict) -> str:
                 if isinstance(text, str):
                     parts.append(text)
     return "\n".join(part.strip() for part in parts if part and part.strip())
+
+
+def _extract_chat_completion_text(payload: dict) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list):
+        return ""
+    parts: list[str] = []
+    for choice in choices:
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message")
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            parts.append(content.strip())
+            continue
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                text = block.get("text")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text.strip())
+    return "\n".join(parts)
 
 
 def _normalize_provider_payload(payload: dict, *, role: AgentRole) -> dict:
@@ -473,3 +497,59 @@ def _candidate_urls(base_url: str) -> list[str]:
     if base_url.endswith("/v1"):
         return [f"{base_url}/responses"]
     return [f"{base_url}/v1/responses"]
+
+
+def _candidate_chat_completion_urls(base_url: str) -> list[str]:
+    base_url = base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return [f"{base_url}/chat/completions"]
+    return [f"{base_url}/v1/chat/completions"]
+
+
+def _candidate_api_specs(
+    base_url: str,
+    *,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+) -> list[_ProviderAPISpec]:
+    response_payload = {
+        "model": model,
+        "input": [
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": system_prompt}],
+            },
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": user_prompt}],
+            },
+        ],
+        "text": {"format": {"type": "text"}},
+    }
+    chat_payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    }
+    specs = [
+        _ProviderAPISpec(
+            kind="responses",
+            url=url,
+            payload=response_payload,
+            extract_text=_extract_response_text,
+        )
+        for url in _candidate_urls(base_url)
+    ]
+    specs.extend(
+        _ProviderAPISpec(
+            kind="chat.completions",
+            url=url,
+            payload=chat_payload,
+            extract_text=_extract_chat_completion_text,
+        )
+        for url in _candidate_chat_completion_urls(base_url)
+    )
+    return specs

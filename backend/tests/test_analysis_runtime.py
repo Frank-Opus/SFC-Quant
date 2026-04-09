@@ -8,7 +8,9 @@ from app.services.market import CcxtMarketDataAdapter
 from app.services.providers import (
     OpenAICompatibleProvider,
     ProviderFactory,
+    _candidate_chat_completion_urls,
     _candidate_urls,
+    _extract_chat_completion_text,
     _extract_json_object,
     _extract_response_text,
     _normalize_provider_payload,
@@ -150,6 +152,12 @@ def test_openai_candidate_urls_prefer_v1_path() -> None:
     assert _candidate_urls("https://example.com/v1") == [
         "https://example.com/v1/responses",
     ]
+    assert _candidate_chat_completion_urls("https://example.com") == [
+        "https://example.com/v1/chat/completions",
+    ]
+    assert _candidate_chat_completion_urls("https://example.com/v1") == [
+        "https://example.com/v1/chat/completions",
+    ]
 
 
 def test_extract_response_text_supports_responses_api_shape() -> None:
@@ -167,6 +175,20 @@ def test_extract_response_text_supports_responses_api_shape() -> None:
     }
 
     assert _extract_response_text(payload).startswith('{"signal_bias":"neutral"')
+
+
+def test_extract_chat_completion_text_supports_openai_shape() -> None:
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"signal_bias":"neutral","recommendation":"hold","confidence":0.5,"summary":"ok","rationale":["r1"],"evidence":[],"sources":[]}'
+                }
+            }
+        ]
+    }
+
+    assert _extract_chat_completion_text(payload).startswith('{"signal_bias":"neutral"')
 
 
 def test_normalize_provider_payload_coerces_common_model_schema_drift() -> None:
@@ -218,6 +240,37 @@ def test_analysis_falls_back_to_mock_when_provider_errors(monkeypatch, tmp_path:
     assert payload["status"] == "fallback"
     assert all(output["provider"] == "mock" for output in payload["outputs"])
     assert all(output["status"] == "fallback" for output in payload["outputs"])
+
+    get_settings.cache_clear()
+
+
+def test_analysis_stops_retrying_provider_after_first_role_failure(monkeypatch, tmp_path: Path) -> None:
+    configure_analysis_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("AI_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("AI_API_KEY", "test-key")
+    monkeypatch.setenv("AI_BASE_URL", "https://example.invalid/v1")
+    monkeypatch.setenv("AI_MODEL", "test-model")
+    get_settings.cache_clear()
+
+    attempts = {"count": 0}
+
+    async def fail_generate(self, *, role, system_prompt, user_prompt):
+        attempts["count"] += 1
+        raise RuntimeError("upstream unavailable")
+
+    monkeypatch.setattr(OpenAICompatibleProvider, "generate", fail_generate)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/analysis/run",
+            json={"symbol": "BTC/USDT", "timeframe": "1m"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "fallback"
+    assert attempts["count"] == 1
+    assert all(output["provider"] == "mock" for output in payload["outputs"])
 
     get_settings.cache_clear()
 
